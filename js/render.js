@@ -16,7 +16,7 @@ const Renderer = (() => {
   const HUE = new Uint32Array(360);
   const FIRE_RAMP = new Uint32Array(64);
   const HOT_RAMP = new Uint32Array(64);
-  let bgTop = [24, 14, 52], bgBot = [8, 12, 30];
+  let bgTop = [14, 14, 16], bgBot = [4, 4, 5];
 
   const pack = (r, g, b) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
   const R = c => c & 255, G = c => (c >> 8) & 255, B = c => (c >> 16) & 255;

@@ -626,7 +626,7 @@ const UI = (() => {
       const i = p.gy * Sim.W + p.gx;
       const t = Sim.type[i];
       const tc = Math.round(Sim.temp[i]);
-      txt = `${p.gx}, ${p.gy}<br><span style="color:${t ? ELEMENTS[t].col[0] : '#9a8fd0'}">${ELEMENTS[t].name}</span> · ${tc}°C`;
+      txt = `${p.gx}, ${p.gy}<br><span style="color:${t ? ELEMENTS[t].col[0] : '#8a8a8a'}">${ELEMENTS[t].name}</span> · ${tc}°C`;
     }
     $('hoverInfo').innerHTML = txt;
     $('fpsInfo').textContent = fps + ' FPS · ' + Sim.particles.count + ' fx';
@@ -899,7 +899,7 @@ const UI = (() => {
     const lvl = Progress.state.level;
     openModal(`
       <div class="el-card">
-        <div class="big-sw" style="background:repeating-linear-gradient(-45deg,#2a1f5c 0 10px,#211850 10px 20px)">${icon('lock')}</div>
+        <div class="big-sw" style="background:repeating-linear-gradient(-45deg,#1c1c1c 0 10px,#141414 10px 20px)">${icon('lock')}</div>
         <div><div style="font-family:var(--pix);font-size:11px;color:var(--ink3);letter-spacing:1px">LOCKED ${(CATEGORIES.find(c => c.id === d.cat) || {}).name || ''}</div>
         <h2 style="margin:4px 0 6px">${r.disc ? '???' : d.name}</h2>
         <p>${r.disc ? 'A mystery element. Find it by experimenting!' : d.desc}</p></div>
