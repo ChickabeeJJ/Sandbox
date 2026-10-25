@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#120a26">
+  <meta name="description" content="Powder Lab - a vibrant falling-sand physics sandbox. Mix 70+ elements, discover reactions, blow things up and level up.">
+  <title>Powder Lab</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- ============================ TOP BAR ============================ -->
+    <header id="topbar">
+      <div class="logo" aria-label="Powder Lab">
+        <span class="logo-mark"><i></i><i></i><i></i><i></i></span>
+        <span class="logo-text">POWDER<b>LAB</b></span>
+      </div>
+
+      <div id="levelBox" title="Earn XP by discovering elements and completing missions">
+        <div class="lvl-badge"><small>LV</small><span id="lvlNum">1</span></div>
+        <div class="xp-wrap">
+          <div class="xp-bar"><div id="xpFill"></div><div id="xpGhost"></div></div>
+          <div class="xp-text"><span id="xpText">0 / 60 XP</span><span id="discText">0 / 0 found</span></div>
+        </div>
+      </div>
+
+      <div id="comboBox" class="hidden">
+        <span class="combo-x">x<b id="comboNum">0</b></span>
+        <span class="combo-label">COMBO</span>
+        <div class="combo-timer"><div id="comboFill"></div></div>
+      </div>
+
+      <div class="top-actions">
+        <button class="ibtn" id="btnMissionsM" data-tip="Missions"><svg data-icon="target"></svg><span class="dot hidden" id="missionDot"></span></button>
+        <button class="ibtn" id="btnCodex" data-tip="Element Codex"><svg data-icon="book"></svg></button>
+        <button class="ibtn" id="btnSound" data-tip="Sound"><svg data-icon="sound"></svg></button>
+        <button class="ibtn" id="btnMenu" data-tip="Menu"><svg data-icon="menu"></svg></button>
+      </div>
+    </header>
+
+    <!-- ============================ MIDDLE ============================ -->
+    <main id="mid">
+      <aside id="left" class="panel">
+        <section>
+          <h3>Brush size <span id="sizeVal" class="pill">4</span></h3>
+          <input type="range" id="sizeRange" min="1" max="40" value="4">
+          <div class="hint">Scroll or [ ] to adjust</div>
+        </section>
+        <section>
+          <h3>Brushes</h3>
+          <div class="toolgrid" id="brushGrid"></div>
+        </section>
+        <section>
+          <h3>Tools</h3>
+          <div class="toolgrid" id="toolGrid"></div>
+        </section>
+        <section class="row2">
+          <button class="tbtn" id="btnUndo"><svg data-icon="undo"></svg><span>Undo</span></button>
+          <button class="tbtn" id="btnFit" disabled><svg data-icon="fit"></svg><span>Fit</span></button>
+        </section>
+        <section id="infoBox">
+          <div id="hoverInfo">-</div>
+          <div id="fpsInfo">60 FPS</div>
+        </section>
+      </aside>
+
+      <section id="stageWrap">
+        <div id="shake">
+          <div id="stage">
+            <canvas id="cvMain"></canvas>
+            <canvas id="cvGlow"></canvas>
+            <canvas id="cvBloom"></canvas>
+          </div>
+        </div>
+        <canvas id="cvOverlay"></canvas>
+        <div id="fx"></div>
+        <div id="flash"></div>
+        <div id="selBar" class="hidden">
+          <button data-sel="copy">Copy</button>
+          <button data-sel="cut">Cut</button>
+          <button data-sel="fill">Fill</button>
+          <button data-sel="delete">Delete</button>
+          <button data-sel="cancel">✕</button>
+        </div>
+        <div id="pausedTag" class="hidden">PAUSED</div>
+        <div id="toastStack"></div>
+      </section>
+
+      <aside id="right" class="panel">
+        <section>
+          <h3>Temperature</h3>
+          <div class="stepper" data-step="temp">
+            <button data-d="-1">◀</button><span id="tempVal">22°C</span><button data-d="1">▶</button>
+          </div>
+        </section>
+        <section>
+          <h3>Speed</h3>
+          <div class="stepper" data-step="speed">
+            <button data-d="-1">◀</button><span id="speedVal">60 t/s</span><button data-d="1">▶</button>
+          </div>
+        </section>
+        <section>
+          <h3>Canvas</h3>
+          <div class="stepper" data-step="canvas">
+            <button data-d="-1">◀</button><span id="canvasVal">Medium</span><button data-d="1">▶</button>
+          </div>
+        </section>
+        <section class="row2">
+          <button class="tbtn big" id="btnPause"><svg data-icon="pause"></svg><span>Pause</span></button>
+          <button class="tbtn big danger" id="btnClear"><svg data-icon="trash"></svg><span>Clear</span></button>
+        </section>
+        <section id="missionPanel">
+          <h3>Missions <span class="pill" id="missionCount">0</span></h3>
+          <div id="missionList"></div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- ============================ MOBILE BAR ============================ -->
+    <div id="mobileBar"></div>
+
+    <!-- ============================ PALETTE ============================ -->
+    <footer id="palette">
+      <div id="palTop">
+        <div id="catTabs"></div>
+        <div id="catName">All</div>
+        <label id="searchBox"><svg data-icon="search"></svg><input id="search" type="text" placeholder="Search" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <div id="palBody">
+        <div id="elGrid"></div>
+        <button id="btnEraser" class="el eraser"><span class="el-name">Eraser</span></button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============================ OVERLAYS ============================ -->
+  <div id="modal" class="hidden"><div class="modal-card" id="modalCard"></div></div>
+  <div id="tooltip" class="hidden"></div>
+  <div id="loader"><div class="loader-logo">POWDER<b>LAB</b></div><div class="loader-bar"><div></div></div></div>
+
+  <script src="js/elements.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/platform.js"></script>
+  <script src="js/progress.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
