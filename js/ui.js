@@ -803,7 +803,6 @@ const UI = (() => {
       <div class="set-row"><label>Music</label><input type="range" id="mMusic" min="0" max="1" step="0.05" value="${set.music}"></div>
       <div class="set-row"><div><label>Glow effects</label><small>Turn off for better performance</small></div><button class="switch ${set.glow ? 'on' : ''}" id="mGlow"></button></div>
       <div class="set-row"><div><label>Screen shake</label></div><button class="switch ${set.shake ? 'on' : ''}" id="mShake"></button></div>
-      <div class="set-row"><div><label>Free play</label><small>Unlock every element right away. Progress still counts.</small></div><button class="switch ${st.freePlay ? 'on' : ''}" id="mFree"></button></div>
       <div class="btn-row">
         <button class="btn" id="mSave">${icon('save')} Save creation</button>
         <button class="btn ghost" id="mLoad">${icon('load')} Load creation</button>
@@ -821,7 +820,6 @@ const UI = (() => {
       mus.oninput = () => { set.music = +mus.value; Sfx.setMusic(set.music); paint(mus); Progress.save(); };
       card.querySelector('#mGlow').onclick = e => { set.glow = !set.glow; e.currentTarget.classList.toggle('on', set.glow); document.body.classList.toggle('noglow', !set.glow); Renderer.setGlow(set.glow); Progress.save(); };
       card.querySelector('#mShake').onclick = e => { set.shake = !set.shake; e.currentTarget.classList.toggle('on', set.shake); Progress.save(); };
-      card.querySelector('#mFree').onclick = e => { const v = !st.freePlay; Progress.setFreePlay(v); e.currentTarget.classList.toggle('on', v); renderPalette(); };
       card.querySelector('#mSave').onclick = () => { Platform.setItem('slot1', JSON.stringify(Sim.serialize())); toast({ k: 'SAVED', n: 'Creation saved', c: 'var(--lime)', life: 1.8 }); Sfx.mission(); };
       card.querySelector('#mLoad').onclick = () => {
         const raw = Platform.getItem('slot1');
@@ -875,7 +873,7 @@ const UI = (() => {
       const list = Progress.visible.filter(d => d.cat === c.id);
       html += `<div class="codex-cat">${c.name}</div><div class="codex-grid">`;
       list.forEach(d => {
-        const un = Progress.isEarned(d.id) || st.freePlay;
+        const un = Progress.isEarned(d.id);
         html += un
           ? `<div class="cx" data-cx="${d.id}"><div class="cx-sw" style="background:${Renderer.swatchCss(d.id)}"></div><div><b>${d.name}</b><span>${d.desc || ''}</span></div></div>`
           : `<div class="cx locked" data-cx="${d.id}"><div class="cx-sw">${icon('lock')}</div><div><b>???</b><span>${lockText(d.id)}</span></div></div>`;

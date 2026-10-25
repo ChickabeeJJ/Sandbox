@@ -273,7 +273,7 @@ const Renderer = (() => {
         const c = P.pcol[p];
         const fade = P.plife[p] < 12 ? P.plife[p] / 12 : 1;
         buf[i] = mix(buf[i], c, fade);
-        gbuf[i] = scale(c, 1.3 * fade);
+        gbuf[i] = scale(c, 0.4 * fade);
       } else {
         const t = P.ptype[p];
         buf[i] = PAL[(t << 4) | (P.pshade[p] & 15)];

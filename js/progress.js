@@ -9,7 +9,7 @@ const Progress = (() => {
   const VISIBLE = ELEMENTS.filter(d => !d.hidden);
   const st = {
     xp: 0, level: 1, unlocked: {}, tried: {}, missions: [], tutorial: 0,
-    freePlay: false, rerollAt: 0, totalMissions: 0, bestCombo: 0, destroyedXpAcc: 0,
+    rerollAt: 0, totalMissions: 0, bestCombo: 0, destroyedXpAcc: 0,
     settings: { sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true },
   };
   const cb = { discover: [], levelup: [], mission: [], xp: [], change: [] };
@@ -23,7 +23,7 @@ const Progress = (() => {
   function isUnlocked(id) {
     const d = ELEMENTS[id];
     if (!d || d.hidden) return false;
-    return st.freePlay || d.unlock === 'base' || !!st.unlocked[d.key];
+    return d.unlock === 'base' || !!st.unlocked[d.key];
   }
   function isEarned(id) { const d = ELEMENTS[id]; return d.unlock === 'base' || !!st.unlocked[d.key]; }
 
@@ -237,6 +237,7 @@ const Progress = (() => {
         Object.assign(st, o);
         st.settings = Object.assign({ sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true }, o.settings || {});
         st.missions = (st.missions || []).filter(m => m && !m.done);
+        delete st.freePlay;
       }
     } catch (e) { /* corrupt save: start fresh */ }
     // safety: level-gated unlocks
@@ -249,10 +250,9 @@ const Progress = (() => {
     location.reload();
   }
 
-  function setFreePlay(v) { st.freePlay = v; save(); emit('change'); }
 
   return {
-    load, save, poll, reportCombo, reroll, isUnlocked, isEarned, unlockReq, unlockByAd, addXp, reset, setFreePlay, xpForLevel,
+    load, save, poll, reportCombo, reroll, isUnlocked, isEarned, unlockReq, unlockByAd, addXp, reset, xpForLevel,
     on: (k, f) => cb[k].push(f),
     get state() { return st; },
     get visible() { return VISIBLE; },
