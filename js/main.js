@@ -221,7 +221,7 @@
         UI.pushUndo();
         Sim.clear();
         Sfx.erase();
-        UI.toast({ k: 'CANVAS CLEARED', n: 'Ctrl+Z to undo', c: 'var(--pink)', life: 1.6 });
+        UI.toast({ k: 'CANVAS CLEARED', n: UI.isTouch() ? 'Tap undo to bring it back' : 'Ctrl+Z to undo', c: 'var(--pink)', life: 1.6 });
         Platform.maybeMidgame();
       },
       onCanvasSize(cells) {

@@ -20,6 +20,7 @@ const UI = (() => {
     special: ['#e0a8ff', '#a45cff'],
   };
   const LASER_DIR_MAP = [2, 1, 0, 7, 6, 5, 4, 3];
+  const isTouch = () => matchMedia('(hover: none) and (pointer: coarse)').matches || innerWidth < 860;
 
   const s = {
     el: E.SAND, brush: 'circle', tool: 'draw', size: 4, cat: 'all', search: '',
@@ -421,7 +422,7 @@ const UI = (() => {
       buildGhost();
       if (a === 'cut') { pushUndo(); Sim.fillRegion(r.x0, r.y0, r.x1, r.y1, 0); }
       s.stamp = true;
-      toast({ k: 'STAMP MODE', n: 'Click to paste', c: 'var(--cyan)', life: 2 });
+      toast({ k: 'STAMP MODE', n: isTouch() ? 'Tap to paste' : 'Click to paste', c: 'var(--cyan)', life: 2 });
     } else if (a === 'fill') {
       pushUndo(); Sim.fillRegion(r.x0, r.y0, r.x1, r.y1, s.el);
       Sim.stats.placed[s.el] += (r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1);
@@ -626,7 +627,7 @@ const UI = (() => {
       const i = p.gy * Sim.W + p.gx;
       const t = Sim.type[i];
       const tc = Math.round(Sim.temp[i]);
-      txt = `${p.gx}, ${p.gy}<br><span style="color:${t ? ELEMENTS[t].col[0] : '#8a8a8a'}">${ELEMENTS[t].name}</span> · ${tc}°C`;
+      txt = `${p.gx}, ${p.gy}<br><span style="color:${t ? ELEMENTS[t].col[0] : '#898b90'}">${ELEMENTS[t].name}</span> · ${tc}°C`;
     }
     $('hoverInfo').innerHTML = txt;
     $('fpsInfo').textContent = fps + ' FPS · ' + Sim.particles.count + ' fx';
@@ -843,7 +844,12 @@ const UI = (() => {
     openModal(`
       <h2>How to play</h2>
       <p>Pick an element below and draw on the canvas. Mix materials, heat them up, freeze them, zap them - and watch what happens. Every new reaction you trigger can <b style="color:var(--yellow)">discover a new element</b>!</p>
-      <div class="help-list" style="margin-top:14px">
+      ${isTouch() ? `<div class="help-list" style="margin-top:14px">
+        <div><kbd>Drag</kbd>Draw selected element</div>
+        <div><kbd>Eraser</kbd>Pick it in the palette to erase</div>
+        <div><kbd>− / +</kbd>Brush size</div>
+        <div><kbd>Toolbar</kbd>Mix, heat, cool, select, zoom, undo, pause</div>
+      </div>` : `<div class="help-list" style="margin-top:14px">
         <div><kbd>Left click</kbd>Draw selected element</div>
         <div><kbd>Right click</kbd>Erase</div>
         <div><kbd>Middle click / P</kbd>Pick element under cursor</div>
@@ -854,7 +860,7 @@ const UI = (() => {
         <div><kbd>1 - 4</kbd>Circle · Square · Line · Spray</div>
         <div><kbd>M · H · C</kbd>Mix · Heat · Cool tools</div>
         <div><kbd>E</kbd>Eraser</div>
-      </div>
+      </div>`}
       <p style="margin-top:14px">Complete <b style="color:var(--lime)">missions</b> and discoveries to earn XP. Level up to unlock TNT, lasers, black holes, nukes and more.</p>
       <div class="btn-row"><button class="btn pink" data-close>Let's go!</button></div>`);
   }
@@ -899,7 +905,7 @@ const UI = (() => {
     const lvl = Progress.state.level;
     openModal(`
       <div class="el-card">
-        <div class="big-sw" style="background:repeating-linear-gradient(-45deg,#1c1c1c 0 10px,#141414 10px 20px)">${icon('lock')}</div>
+        <div class="big-sw" style="background:repeating-linear-gradient(-45deg,#1b1c1f 0 10px,#131417 10px 20px)">${icon('lock')}</div>
         <div><div style="font-family:var(--pix);font-size:11px;color:var(--ink3);letter-spacing:1px">LOCKED ${(CATEGORIES.find(c => c.id === d.cat) || {}).name || ''}</div>
         <h2 style="margin:4px 0 6px">${r.disc ? '???' : d.name}</h2>
         <p>${r.disc ? 'A mystery element. Find it by experimenting!' : d.desc}</p></div>
@@ -978,6 +984,7 @@ const UI = (() => {
     build, layout, applyInput, drawOverlay, updateHover, renderPalette, selectElement, revealInPalette,
     updateXp, renderMissions, updateMissionBars, setCombo, pop, toast, shake, tickShake, flash,
     openModal, closeModal, openHelp, showLevelUp, pushUndo, fitView,
+    isTouch,
     get state() { return s; },
     get speed() { return SPEEDS[s.speedIdx]; },
     get canvasCells() { return CANVASES[s.canvasIdx].cells; },
