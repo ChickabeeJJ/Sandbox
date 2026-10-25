@@ -802,6 +802,7 @@ const UI = (() => {
       <div class="set-row"><label>Sound effects</label><input type="range" id="mSfx" min="0" max="1" step="0.05" value="${set.sfx}"></div>
       <div class="set-row"><label>Music</label><input type="range" id="mMusic" min="0" max="1" step="0.05" value="${set.music}"></div>
       <div class="set-row"><div><label>Glow effects</label><small>Turn off for better performance</small></div><button class="switch ${set.glow ? 'on' : ''}" id="mGlow"></button></div>
+      <div class="set-row"><div><label>Light mode</label><small>Dark is the default</small></div><button class="switch ${set.theme === 'light' ? 'on' : ''}" id="mTheme"></button></div>
       <div class="set-row"><div><label>Screen shake</label></div><button class="switch ${set.shake ? 'on' : ''}" id="mShake"></button></div>
       <div class="btn-row">
         <button class="btn" id="mSave">${icon('save')} Save creation</button>
@@ -819,6 +820,12 @@ const UI = (() => {
       sfx.oninput = () => { set.sfx = +sfx.value; Sfx.setSfx(set.sfx); paint(sfx); Progress.save(); };
       mus.oninput = () => { set.music = +mus.value; Sfx.setMusic(set.music); paint(mus); Progress.save(); };
       card.querySelector('#mGlow').onclick = e => { set.glow = !set.glow; e.currentTarget.classList.toggle('on', set.glow); document.body.classList.toggle('noglow', !set.glow); Renderer.setGlow(set.glow); Progress.save(); };
+      card.querySelector('#mTheme').onclick = e => {
+        set.theme = set.theme === 'light' ? 'dark' : 'light';
+        e.currentTarget.classList.toggle('on', set.theme === 'light');
+        applyTheme(set.theme);
+        Progress.save();
+      };
       card.querySelector('#mShake').onclick = e => { set.shake = !set.shake; e.currentTarget.classList.toggle('on', set.shake); Progress.save(); };
       card.querySelector('#mSave').onclick = () => { Platform.setItem('slot1', JSON.stringify(Sim.serialize())); toast({ k: 'SAVED', n: 'Creation saved', c: 'var(--lime)', life: 1.8 }); Sfx.mission(); };
       card.querySelector('#mLoad').onclick = () => {
@@ -903,7 +910,7 @@ const UI = (() => {
     const lvl = Progress.state.level;
     openModal(`
       <div class="el-card">
-        <div class="big-sw" style="background:repeating-linear-gradient(-45deg,#1b1c1f 0 10px,#131417 10px 20px)">${icon('lock')}</div>
+        <div class="big-sw locked-sw">${icon('lock')}</div>
         <div><div style="font-family:var(--pix);font-size:11px;color:var(--ink3);letter-spacing:1px">LOCKED ${(CATEGORIES.find(c => c.id === d.cat) || {}).name || ''}</div>
         <h2 style="margin:4px 0 6px">${r.disc ? '???' : d.name}</h2>
         <p>${r.disc ? 'A mystery element. Find it by experimenting!' : d.desc}</p></div>
@@ -976,13 +983,21 @@ const UI = (() => {
     }
   }
 
+  function applyTheme(mode) {
+    document.documentElement.dataset.theme = mode;
+    try { localStorage.setItem('powderlab_theme', mode); } catch (e) { /* ignore */ }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = mode === 'light' ? '#eceef1' : '#000000';
+    Renderer.setTheme(mode);
+  }
+
   const fmt = n => n >= 10000 ? (n / 1000).toFixed(1) + 'k' : Math.floor(n).toLocaleString();
 
   return {
     build, layout, applyInput, drawOverlay, updateHover, renderPalette, selectElement, revealInPalette,
     updateXp, renderMissions, updateMissionBars, setCombo, pop, toast, shake, tickShake, flash,
     openModal, closeModal, openHelp, showLevelUp, pushUndo, fitView,
-    isTouch,
+    isTouch, applyTheme,
     get state() { return s; },
     get speed() { return SPEEDS[s.speedIdx]; },
     get canvasCells() { return CANVASES[s.canvasIdx].cells; },

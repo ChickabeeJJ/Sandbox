@@ -216,6 +216,7 @@
     Renderer.setGlow(set.glow);
 
     Renderer.init(document.getElementById('cvMain'), document.getElementById('cvGlow'), document.getElementById('cvBloom'));
+    UI.applyTheme(set.theme === 'light' ? 'light' : 'dark');
     UI.build({
       onClear() {
         UI.pushUndo();

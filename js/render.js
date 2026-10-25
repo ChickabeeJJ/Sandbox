@@ -60,7 +60,13 @@ const Renderer = (() => {
     buildPalettes();
   }
 
-  function setTheme(top, bot) { bgTop = top; bgBot = bot; if (W) buildBg(); }
+  let light = false;
+  function setTheme(mode) {
+    light = mode === 'light';
+    if (light) { bgTop = [236, 238, 242]; bgBot = [214, 217, 223]; }
+    else { bgTop = [13, 14, 17]; bgBot = [4, 4, 6]; }
+    if (W) buildBg();
+  }
 
   function buildBg() {
     bg = new Uint32Array(W * H);
@@ -71,10 +77,14 @@ const Renderer = (() => {
       const r = bgTop[0] + (bgBot[0] - bgTop[0]) * f, g = bgTop[1] + (bgBot[1] - bgTop[1]) * f, b = bgTop[2] + (bgBot[2] - bgTop[2]) * f;
       for (let x = 0; x < W; x++) {
         let k = 1;
-        if (x % 10 === 0 || y % 10 === 0) k = 1.18;
         const star = r01();
-        if (star < 0.0025) k = 2.4;
-        else if (star < 0.006) k = 1.6;
+        if (light) {
+          if (x % 10 === 0 || y % 10 === 0) k = 0.965;
+        } else {
+          if (x % 10 === 0 || y % 10 === 0) k = 1.18;
+          if (star < 0.0025) k = 2.4;
+          else if (star < 0.006) k = 1.6;
+        }
         bg[y * W + x] = pack(Math.min(255, r * k) | 0, Math.min(255, g * k) | 0, Math.min(255, b * k) | 0);
       }
     }

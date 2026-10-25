@@ -10,7 +10,7 @@ const Progress = (() => {
   const st = {
     xp: 0, level: 1, unlocked: {}, tried: {}, missions: [], tutorial: 0,
     rerollAt: 0, totalMissions: 0, bestCombo: 0, destroyedXpAcc: 0,
-    settings: { sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true },
+    settings: { sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true, theme: 'dark' },
   };
   const cb = { discover: [], levelup: [], mission: [], xp: [], change: [] };
   const emit = (k, ...a) => cb[k].forEach(f => f(...a));
@@ -235,7 +235,7 @@ const Progress = (() => {
       if (raw) {
         const o = JSON.parse(raw);
         Object.assign(st, o);
-        st.settings = Object.assign({ sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true }, o.settings || {});
+        st.settings = Object.assign({ sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true, theme: 'dark' }, o.settings || {});
         st.missions = (st.missions || []).filter(m => m && !m.done);
         delete st.freePlay;
       }
