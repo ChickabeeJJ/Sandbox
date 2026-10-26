@@ -6,7 +6,9 @@ Open `index.html` through any static server (for example `python3 -m http.server
 
 ## What's in it
 
-- **72 elements** in 8 categories: powders, liquids, gases, solids, life, energy, explosives and special.
+- **142 elements** in 8 categories: powders, liquids, gases, solids, life, energy, explosives and special. Highlights: portals, white hole, vortex, stasis field, mini sun, volcano, meteor, cluster and cryo bombs, phoenix, ghost, saplings that grow full trees, lead-to-gold alchemy, uranium meltdowns, stardust that falls up.
+- **Atoms (currency)** come from missions, level-ups, discoveries, a 7-day daily streak, big combos, every 2,500 pixels destroyed and an optional rewarded ad. Spend them in the **Shop** on premium elements and extra save slots.
+- **Save slots**: 3 to start (up to 12), each with a thumbnail and an editable name. Save and Load buttons in the right panel ask which slot to use.
 - **Real systems, not just colors.** Heat spreads between cells, and materials melt, boil, freeze and condense. Burning spreads through the heat model, electricity travels along metal and water, explosions throw debris around as physics particles, and lightning, lasers, fireworks, black holes, cloners, viruses and fish each have their own behaviour.
 - **Emergent chains.** Burning wood can leave coal, burning coal can melt stone into lava, lava meeting water turns into obsidian, and glass shattered by an explosion becomes glitter.
 - **Progression loop.** Creating an element in the sandbox for the first time *discovers* it. Discoveries and missions give XP, and leveling up unlocks bigger toys (TNT, lasers, black holes, a nuke). Missions rotate and scale with your level, and they start with a short tutorial chain.
@@ -32,12 +34,12 @@ Open `index.html` through any static server (for example `python3 -m http.server
 
 ## CrazyGames integration (`js/platform.js`)
 
-- Loads SDK v3 (`https://sdk.crazygames.com/crazygames-sdk-v3.js`) and calls `SDK.init()`.
+- Loads SDK v3 (`https://sdk.crazygames.com/crazygames-sdk-v3.js`) only when the game is running on a CrazyGames domain (or with `?cg` in the URL), then calls `SDK.init()`. Other hosts skip it and boot instantly.
 - Calls `loadingStart` / `loadingStop` around boot.
 - Calls `gameplayStart` on the first interaction and `gameplayStop` while menus or modals are open.
 - Calls `happytime()` on discoveries and level-ups.
 - **Midgame ad** on *Clear canvas*, at most once every 3 minutes. Audio is muted while the ad plays.
-- **Rewarded ad**: "Unlock now" on a locked element's card.
+- **Rewarded ads**: "Unlock now" on a level- or discovery-locked element's card, and +75 atoms in Shop → Free atoms (3-minute cooldown).
 - Progress and the canvas are saved through `SDK.data` on CrazyGames, or `localStorage` when the game runs standalone.
 - Every SDK call is wrapped, so the game runs offline or off-platform with no changes.
 

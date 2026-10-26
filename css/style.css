@@ -443,3 +443,101 @@ html[data-theme="light"] #pausedTag { background: #ffffffe6; color: #b58300; }
 html[data-theme="light"] .pop { text-shadow: 0 3px 0 #0009, 0 0 10px currentColor; }
 html[data-theme="light"] #cvGlow, html[data-theme="light"] #cvBloom { opacity: .55; }
 html[data-theme="light"] .toast .t-k { filter: brightness(.68) saturate(1.3); }
+
+/* ===================================================================== */
+/*  Atoms, shop, save slots, daily bonus                                  */
+/* ===================================================================== */
+.atom-pill {
+  display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 8px 0 10px; border-radius: 12px;
+  background: linear-gradient(180deg, #1d3a4a, #12252f); box-shadow: 0 4px 0 #000, inset 0 0 0 1.5px #3de0ff55;
+  font-family: var(--pix); font-weight: 700; font-size: 15px; color: #dff8ff; transition: transform .08s;
+}
+.atom-pill svg { width: 20px; height: 20px; color: var(--cyan); animation: atomSpin 6s linear infinite; }
+@keyframes atomSpin { to { transform: rotate(360deg); } }
+.atom-plus { font-style: normal; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; background: var(--cyan); color: #04233a; font-size: 13px; }
+.atom-pill:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+.atom-pill.bump { animation: badgePop .5s cubic-bezier(.2, 2, .4, 1); }
+html[data-theme="light"] .atom-pill { background: linear-gradient(180deg, #e8fbff, #cdeff9); box-shadow: 0 3px 0 #9fd3e2, inset 0 0 0 1.5px #3de0ff88; color: #04324a; }
+.float-txt { position: fixed; z-index: 70; transform: translateX(-50%); pointer-events: none; font-family: var(--pix); font-weight: 700; font-size: 13px;
+  text-shadow: 0 2px 0 #000; animation: floatUp 1.15s ease-out forwards; white-space: nowrap; }
+@keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.7); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, 22px); } }
+.ai { display: inline-flex; vertical-align: -3px; margin-right: 3px; }
+.ai svg { width: 15px; height: 15px; }
+.atom-cost { display: inline-flex; align-items: center; gap: 3px; color: var(--cyan); }
+.atom-cost svg { width: 13px; height: 13px; }
+.el.shop-item { box-shadow: inset 0 0 0 1.5px #3de0ff44; }
+.mi-atom { display: inline-flex; vertical-align: -2px; color: var(--cyan); }
+.mi-atom svg { width: 11px; height: 11px; }
+
+.shop-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.shop-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.shop-tabs button { font-family: var(--pix); font-size: 12px; padding: 8px 12px; border-radius: 10px; background: #ffffff10; color: var(--ink2); }
+.shop-tabs button.on { background: var(--cyan); color: #04233a; }
+.atom-bal { margin-left: auto; display: flex; align-items: center; gap: 4px; font-family: var(--pix); font-size: 16px; color: var(--cyan); }
+.atom-bal b { color: var(--ink); }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.shop-card { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #ffffff0a; box-shadow: inset 0 0 0 1.5px #ffffff10; }
+.shop-card.focus { box-shadow: inset 0 0 0 2px var(--yellow), 0 0 20px #ffd23d44; }
+.shop-card.owned { opacity: .6; }
+.shop-sw { width: 48px; height: 48px; border-radius: 12px; flex: none; box-shadow: inset 0 -4px 0 #0005; }
+.shop-info { flex: 1; min-width: 0; }
+.shop-info b { display: block; font-family: var(--pix); font-size: 13px; margin-bottom: 3px; }
+.shop-info span { display: block; font-size: 12px; color: var(--ink2); line-height: 1.3; }
+.shop-buy { padding: 9px 12px; font-size: 13px; flex: none; }
+.shop-slots { text-align: center; padding: 10px 0; }
+.big-num { font-family: var(--pix); font-weight: 700; font-size: 56px; color: var(--yellow); }
+.big-num small { font-size: 14px; color: var(--ink2); }
+.shop-free { display: flex; flex-direction: column; gap: 10px; }
+.free-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: #ffffff0a; }
+.free-row > div:nth-child(2) { flex: 1; }
+.free-row b { display: block; font-family: var(--pix); font-size: 13px; }
+.free-row span { font-size: 13px; color: var(--ink2); }
+.free-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #3de0ff22; color: var(--cyan); }
+.free-ic svg { width: 22px; height: 22px; }
+.earn-list { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: #ffffff06; font-size: 13px; color: var(--ink2); }
+.earn-list b { font-family: var(--pix); font-size: 12px; color: var(--ink); }
+.earn-list .ai { color: var(--cyan); }
+
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.slot { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: #ffffff0a; box-shadow: inset 0 0 0 1.5px #ffffff10; }
+.slot-thumb { aspect-ratio: 16 / 10; border-radius: 10px; background: #000; display: grid; place-items: center; overflow: hidden; color: var(--ink3); }
+.slot-thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.slot-thumb svg { width: 26px; height: 26px; }
+.slot-name { font-family: var(--pix); font-size: 12px; color: var(--ink); background: none; border: 0; outline: none; padding: 2px 0; width: 100%; border-bottom: 1px dashed transparent; }
+input.slot-name:focus { border-bottom-color: var(--cyan); }
+.slot-date { font-size: 11px; color: var(--ink3); }
+.slot-btns { display: flex; gap: 6px; }
+.slot-btns .btn { flex: 1; padding: 8px 6px; font-size: 11px; }
+.slot-btns .btn.danger-txt { flex: none; color: var(--danger); }
+.slot.empty .slot-name { color: var(--ink3); }
+.locked-slot { box-shadow: inset 0 0 0 1.5px #3de0ff44; }
+html[data-theme="light"] .slot, html[data-theme="light"] .shop-card, html[data-theme="light"] .free-row, html[data-theme="light"] .shop-tabs button:not(.on) { background: #1a1f2a0d; }
+html[data-theme="light"] .slot-thumb { background: #d6d9de; }
+
+.daily-ic { width: 84px; height: 84px; margin: 10px auto; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(145deg, var(--yellow), var(--orange)); color: #3a2200; animation: luN .8s cubic-bezier(.2, 2, .4, 1); }
+.daily-ic svg { width: 44px; height: 44px; }
+.streak { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+.streak i { font-style: normal; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-family: var(--pix); font-size: 12px; background: #ffffff10; color: var(--ink3); }
+.streak i.on { background: var(--yellow); color: #3a2200; box-shadow: 0 0 12px #ffd23d66; }
+
+/* right panel: missions scroll, highest combo pinned to the bottom */
+#right { overflow: hidden; }
+#missionPanel { flex: 1 1 auto; min-height: 70px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #ffffff22 transparent; margin-right: -6px; padding-right: 6px; }
+#bestCombo { flex: none; font-family: var(--pix); font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 8px; border-top: 1px solid #ffffff10; }
+#bestCombo b { color: var(--yellow); font-weight: 400; }
+
+.loader-warn { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 16px; right: 16px; text-align: center; font-family: var(--pix); font-size: 11px; color: var(--ink3); letter-spacing: .5px; }
+#loader { transition: opacity .25s; }
+
+@media (max-width: 860px), (max-height: 520px) {
+  #btnShop, #btnSaves { display: none; }
+  .atom-pill { height: 38px; font-size: 13px; padding: 0 6px 0 8px; }
+  .atom-plus { display: none; }
+  .top-actions { gap: 5px; }
+}
+@media (max-width: 480px) {
+  .logo, #btnSound { display: none; }
+  .ibtn { width: 36px; height: 36px; }
+  .atom-pill { height: 36px; }
+  #levelBox { gap: 6px; }
+}

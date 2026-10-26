@@ -12,8 +12,22 @@ const Platform = (() => {
   const MIDGAME_GAP = 3 * 60 * 1000;
   const PREFIX = 'powderlab_';
 
+  function loadSdk(timeout) {
+    return new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+      const t = setTimeout(() => res(false), timeout);
+      s.onload = () => { clearTimeout(t); res(true); };
+      s.onerror = () => { clearTimeout(t); res(false); };
+      document.head.appendChild(s);
+    });
+  }
+
   async function init() {
     try {
+      // only pull in the SDK when actually hosted on CrazyGames, so other hosts boot instantly
+      const onCg = /crazygames/i.test(location.hostname + ' ' + document.referrer) || /[?&]cg\b/.test(location.search);
+      if (onCg && !window.CrazyGames) await loadSdk(4000);
       if (window.CrazyGames && window.CrazyGames.SDK) {
         await window.CrazyGames.SDK.init();
         sdk = window.CrazyGames.SDK;

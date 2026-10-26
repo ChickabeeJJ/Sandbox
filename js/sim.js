@@ -18,6 +18,8 @@ const Sim = (() => {
   };
   const events = [];
   const blackholes = [];
+  const halos = [];                      // [index, kind] for sun / white hole / vortex glows
+  let portB = [], portBPrev = [], stasisL = [], stasisPrev = [];
 
   /* ---------------- RNG (xorshift, faster than Math.random) ---------------- */
   let seed = (Math.random() * 0xffffffff) >>> 0 || 1;
@@ -215,7 +217,7 @@ const Sim = (() => {
      Combustion & explosions
      ======================================================================== */
   function isWet(o) {
-    return o === E.WATER || o === E.SALTWATER || o === E.ICE || o === E.SNOW || o === E.LN2 || o === E.MUD;
+    return o === E.WATER || o === E.SALTWATER || o === E.ICE || o === E.SNOW || o === E.LN2 || o === E.MUD || o === E.FOAM;
   }
 
   function burnStep(i, x, y, t) {
@@ -246,6 +248,19 @@ const Sim = (() => {
   function detonate(i, x, y, t) {
     setEmpty(i);
     explode(x, y, EXPL[t], t);
+    if (t === E.FIRECRACKER) {
+      const hue = rnd() * 360;
+      for (let k = 0; k < 8; k++) {
+        const a = rnd() * Math.PI * 2, s2 = 0.4 + rnd() * 0.9;
+        addParticle(x, y, Math.cos(a) * s2, Math.sin(a) * s2 - 0.4, 0, 0, 0, 1, hsl(hue + rnd() * 60, 1, 0.65), 12 + rint(14));
+      }
+    }
+    if (t === E.CLUSTERBOMB) {
+      for (let k = 0; k < 12; k++) {
+        const a = -Math.PI / 2 + (rnd() - 0.5) * 2.4, s2 = 1.2 + rnd() * 1.6;
+        addParticle(x, y - 1, Math.cos(a) * s2, Math.sin(a) * s2, E.BOMBLET, rint(256), ambient, 0, 0, 0);
+      }
+    }
     if (t === E.BARREL) {
       for (let k = 0; k < 26; k++) {
         const a = rnd() * Math.PI * 2, s = 0.6 + rnd() * 1.6;
@@ -341,6 +356,7 @@ const Sim = (() => {
         }
       }
       if (t === E.WATER || t === E.SALTWATER) temp[i] += 2;
+      else if (t === E.BULB) life[i] = 40;
     }
     for (let n = 0; n < list.length; n++) {
       const i = list[n];
@@ -474,6 +490,13 @@ const Sim = (() => {
   function strike(x, y) {
     const j = y * W + x;
     if (CONDUCT[type[j]]) electrify(j);
+    // alchemy: lightning transmutes lead into gold
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const q = ny * W + nx;
+      if (type[q] === E.LEAD && rnd() < 0.45) convert(q, E.GOLD);
+    }
     for (let k = 0; k < 14; k++) {
       const nx = x + rint(7) - 3, ny = y + rint(7) - 3;
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
@@ -538,11 +561,45 @@ const Sim = (() => {
     stamp[ci] = tstamp;
   }
 
+  const WHITE_SPEW = ['SAND', 'WATER', 'FIRE', 'LAVA', 'SNOW', 'GLITTER', 'CONFETTI', 'OIL', 'STARDUST', 'PLASMA', 'SLIME', 'GLOWSTICK', 'SALT', 'SEED', 'EMBER', 'GOLD', 'DIAMOND']
+    .map(k => E[k]);
+
+  function meteorImpact(i, x, y) {
+    setEmpty(i);
+    explode(x, y, 16, E.METEOR);
+    for (let k = 0; k < 40; k++) {
+      const a = -Math.PI / 2 + (rnd() - 0.5) * 2.6, sp = 1 + rnd() * 2.6;
+      addParticle(x, y - 1, Math.cos(a) * sp, Math.sin(a) * sp, rnd() < 0.6 ? E.LAVA : E.STONE, rint(256), 1300, 0, 0, 0);
+    }
+  }
+
+  function cryoBlast(i, cx, cy) {
+    setEmpty(i);
+    const r = 15, r2 = r * r;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const j = y * W + x, o = type[j];
+      temp[j] = Math.min(temp[j], -220 + Math.sqrt(d2) * 6);
+      if (o === E.WATER || o === E.SALTWATER || o === E.STEAM) convert(j, E.ICE);
+      else if (o === E.LAVA) convert(j, E.OBSIDIAN);
+      else if (o === E.FIRE || o === E.BLUEFIRE || o === E.PLASMA || o === E.RAINBOWFIRE) setEmpty(j);
+      else if (o === 0 && rnd() < 0.25) setNew(j, E.SNOW);
+    }
+    for (let k = 0; k < 60; k++) { const a = rnd() * 6.283, sp = 0.5 + rnd() * 2; addParticle(cx, cy, Math.cos(a) * sp, Math.sin(a) * sp, 0, 0, 0, 1, hsl(190, 1, 0.8), 25 + rint(25)); }
+    stats.explosions++;
+    events.push({ type: 'boom', x: cx, y: cy, r: 10, destroyed: 0 });
+  }
+
   /* ========================================================================
      Per-cell update
      ======================================================================== */
   function update(i, x, y, t) {
     const tp = temp[i];
+
+    if (t === E.COAL && tp > 2800 && rnd() < 0.05) { convert(i, E.DIAMOND); return; }
 
     // ---- phase transitions ----
     if (tp > HI_T[t] && rnd() < HI_P[t]) {
@@ -559,11 +616,20 @@ const Sim = (() => {
       if (EXPL[t]) { detonate(i, x, y, t); return; }
       if (t === E.THERMITE) { setNew(i, E.TBURN); stats.burned++; return; }
       if (t === E.FIREWORK) { type[i] = E.ROCKET; life[i] = 22 + rint(26); temp[i] = 600; return; }
+      if (t === E.SMOKEBOMB) {
+        for (let k = 0; k < 2; k++) {
+          const j = emptyNbPreferUp(x, y);
+          if (j >= 0) { setNew(j, E.COLORSMOKE); shade[j] = shade[i] + rint(40); }
+        }
+        if (temp[i] < 300) temp[i] = 300;
+        if (rnd() < 0.012) convert(i, E.ASH);
+        return;
+      }
       if (burnStep(i, x, y, t)) return;
     }
 
     switch (t) {
-      case E.FIRE: {
+      case E.FIRE: case E.BLUEFIRE: case E.RAINBOWFIRE: {
         const n = rndNb(x, y);
         if (n >= 0) {
           const o = type[n];
@@ -576,7 +642,8 @@ const Sim = (() => {
           if (FLAM[o]) temp[n] += 120;
         }
         if (--life[i] <= 0) { if (rnd() < 0.15) setNew(i, E.SMOKE); else setEmpty(i); return; }
-        if (temp[i] < 800) temp[i] = 800;
+        const ft = t === E.BLUEFIRE ? 1300 : 800;
+        if (temp[i] < ft) temp[i] = ft;
         const tx = x + rint(3) - 1, ty = rnd() < 0.75 ? y - 1 : y;
         if (tx >= 0 && tx < W && ty >= 0) {
           const j = ty * W + tx, o = type[j];
@@ -953,12 +1020,479 @@ const Sim = (() => {
         movePowder(i, x, y, t);
         return;
       }
-      case E.BOMB: case E.NUKE: {
+
+      /* ------------------------------ new elements ------------------------------ */
+      case E.FROSTFIRE: {
+        const n = rndNb(x, y);
+        if (n >= 0) {
+          const o = type[n];
+          if (o === E.WATER || o === E.SALTWATER) convert(n, E.ICE);
+          else if (o === E.FIRE || o === E.BLUEFIRE || o === E.RAINBOWFIRE) setEmpty(n);
+          else if (o === E.LAVA) convert(n, E.OBSIDIAN);
+          else if (o === E.STEAM) convert(n, E.SNOW);
+          if (temp[n] > -200) temp[n] -= 70;
+        }
+        if (--life[i] <= 0) { if (rnd() < 0.2) setNew(i, E.SNOW); else setEmpty(i); return; }
+        if (temp[i] > -150) temp[i] = -150;
+        const tx = x + rint(3) - 1, ty = rnd() < 0.75 ? y - 1 : y;
+        if (tx >= 0 && tx < W && ty >= 0) {
+          const j = ty * W + tx, o = type[j];
+          if (o === 0 || STATE[o] === ST.GAS) { swap(i, j); stamp[j] = tstamp; }
+        }
+        return;
+      }
+      case E.RADIATION: {
+        if (--life[i] <= 0) { setEmpty(i); return; }
+        let ci = i, cx = x, cy = y;
+        for (let s2 = 0; s2 < 2; s2++) {
+          const k = rint(8), nx = cx + NX[k], ny = cy + NY[k];
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) { setEmpty(ci); return; }
+          const j = ny * W + nx, o = type[j];
+          if (o === 0 || STATE[o] === ST.GAS) { swap(ci, j); stamp[j] = tstamp; ci = j; cx = nx; cy = ny; continue; }
+          if (o === E.RADIATION || o === E.URANIUM) continue;
+          if (o === E.PLANT || o === E.FLOWER || o === E.LEAF || o === E.MOSS || o === E.SEED || o === E.ALGAE) convert(j, E.FUNGUS);
+          else if (o === E.FISH || o === E.ANT || o === E.WORM || o === E.BIRD || o === E.BEE) convert(j, E.ASH);
+          else if (o !== E.LEAD && !INDES[o]) temp[j] += 40;
+          setEmpty(ci);
+          return;
+        }
+        return;
+      }
+      case E.METEOR: {
+        if (life[i] === 0) life[i] = rnd() < 0.5 ? 1 : 2;
+        const dx = life[i] === 1 ? 1 : -1;
+        let ci = i, cx = x, cy = y;
+        for (let s2 = 0; s2 < 3; s2++) {
+          const nx = cx + (s2 === 1 ? 0 : dx), ny = cy + 1;
+          if (ny >= H || nx < 0 || nx >= W) { meteorImpact(ci, cx, cy); return; }
+          const j = ny * W + nx, o = type[j];
+          if (o === 0 || STATE[o] === ST.GAS || STATE[o] === ST.ENERGY) {
+            type[j] = E.METEOR; life[j] = life[ci]; shade[j] = shade[ci]; temp[j] = 1500; stamp[j] = tstamp;
+            setNew(ci, E.FIRE); life[ci] = 6 + rint(10);
+            ci = j; cx = nx; cy = ny;
+          } else { meteorImpact(ci, cx, cy); return; }
+        }
+        return;
+      }
+      case E.URANIUM: {
+        temp[i] += 1.4;
+        if (temp[i] > 2400 && rnd() < 0.004) {
+          setEmpty(i); explode(x, y, 12, E.URANIUM);
+          for (let k = 0; k < 20; k++) { const a = rnd() * 6.283; addParticle(x, y, Math.cos(a) * 2, Math.sin(a) * 2, 0, 0, 0, 1, hsl(110, 1, 0.6), 30 + rint(20)); }
+          return;
+        }
+        if (rnd() < 0.006) { const j = rndNb(x, y); if (j >= 0 && type[j] === 0) setNew(j, E.RADIATION); }
+        movePowder(i, x, y, t);
+        return;
+      }
+      case E.MOONDUST:
+        if (rnd() < 0.22) movePowder(i, x, y, t);
+        return;
+      case E.STARDUST: {
+        if (y === 0) return;
+        const j = i - W, o = type[j];
+        if (o === 0 || STATE[o] === ST.GAS || STATE[o] === ST.LIQUID || STATE[o] === ST.ENERGY) { swap(i, j); stamp[j] = tstamp; return; }
+        const d = rnd() < 0.5 ? -1 : 1;
+        for (let k = 0; k < 2; k++) {
+          const nx = x + (k ? -d : d);
+          if (nx < 0 || nx >= W) continue;
+          const q = (y - 1) * W + nx;
+          if (type[q] === 0 || STATE[type[q]] === ST.GAS) { swap(i, q); stamp[q] = tstamp; return; }
+        }
+        return;
+      }
+      case E.CEMENT: {
+        if (rnd() < 0.1) {
+          const n = rndNb(x, y);
+          if (n >= 0 && type[n] === E.WATER) { convert(i, E.CONCRETE); if (rnd() < 0.5) setEmpty(n); return; }
+        }
+        movePowder(i, x, y, t);
+        return;
+      }
+      case E.SUGAR: {
+        const n = rndNb(x, y);
+        if (n >= 0 && type[n] === E.WATER && rnd() < 0.03) { convert(i, E.HONEY); return; }
+        movePowder(i, x, y, t);
+        return;
+      }
+      case E.IRON: {
+        if (rnd() < 0.01) { const n = rndNb(x, y); if (n >= 0 && (type[n] === E.WATER || type[n] === E.SALTWATER) && rnd() < 0.1) { convert(i, E.RUST); return; } }
+        movePowder(i, x, y, t);
+        return;
+      }
+      case E.SOAP: {
+        const n = rndNb(x, y);
+        if (n >= 0 && type[n] === E.WATER && rnd() < 0.05) {
+          const j = emptyNbPreferUp(x, y);
+          if (j >= 0) { setNew(j, E.BUBBLE); stats.created[E.BUBBLE]++; }
+          if (rnd() < 0.08) { setEmpty(i); return; }
+        }
+        moveLiquid(i, x, y, t);
+        return;
+      }
+      case E.FOAM:
+        if (--life[i] <= 0) { setEmpty(i); return; }
+        moveLiquid(i, x, y, t);
+        return;
+      case E.GREEK_FIRE: {
+        if (--life[i] <= 0) { setNew(i, E.SMOKE); return; }
+        if (temp[i] < 1000) temp[i] = 1000;
+        if (rnd() < 0.3) { const j = emptyNbPreferUp(x, y); if (j >= 0) { setNew(j, E.FIRE); life[j] = 6 + rint(12); } }
+        const n = rndNb(x, y);
+        if (n >= 0 && FLAM[type[n]]) temp[n] += 100;
+        moveLiquid(i, x, y, t);
+        return;
+      }
+      case E.HELIUM:
+        moveGas(i, x, y, t);
+        if (rnd() < 0.8 && y > 0) { const j = i - W; if (type[j] === 0) { swap(i, j); stamp[j] = tstamp; } }
+        return;
+      case E.CHLORINE: {
+        const n = rndNb(x, y);
+        if (n >= 0) {
+          const o = type[n];
+          if ((o === E.PLANT || o === E.FLOWER || o === E.FISH || o === E.LEAF || o === E.ANT || o === E.WORM || o === E.BEE || o === E.BIRD || o === E.MOSS) && rnd() < 0.08) convert(n, E.ASH);
+          else if (o === E.WATER && rnd() < 0.01) { convert(n, E.ACID); setEmpty(i); return; }
+        }
+        if (--life[i] <= 0) { setEmpty(i); return; }
+        // heavy gas: sinks
+        const r = rnd();
+        const tx = x + rint(3) - 1, ty = r < 0.5 ? y + 1 : (r < 0.6 ? y - 1 : y);
+        if (tx >= 0 && tx < W && ty >= 0 && ty < H) {
+          const j = ty * W + tx, o = type[j];
+          if (o === 0 || (STATE[o] === ST.GAS && o !== E.CHLORINE && ty > y)) { swap(i, j); stamp[j] = tstamp; }
+        }
+        return;
+      }
+      case E.CLOUD: case E.STORM: {
+        const storm = t === E.STORM;
+        if (rnd() < 0.06) {
+          const j = x + (rnd() < 0.5 ? -1 : 1);
+          if (j >= 0 && j < W && type[y * W + j] === 0) { swap(i, y * W + j); stamp[y * W + j] = tstamp; }
+        }
+        if (y < H - 1 && rnd() < (storm ? 0.03 : 0.012) && type[i + W] === 0) {
+          setNew(i + W, ambient <= 0 ? E.SNOW : E.WATER);
+          if (++life[i] > (storm ? 90 : 60) && rnd() < 0.3) { setEmpty(i); return; }
+        }
+        if (storm && y < H - 2 && rnd() < 0.0006) { bolt(x, y + 1, H * 2, 0); events.push({ type: 'zap', x, y }); }
+        return;
+      }
+      case E.MAGNET: {
+        const R = 14;
+        for (let k = 0; k < 30; k++) {
+          const dx = rint(R * 2 + 1) - R, dy = rint(R * 2 + 1) - R;
+          if (dx * dx + dy * dy > R * R || (dx === 0 && dy === 0)) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx, o = type[j];
+          if (o !== E.IRON && o !== E.MOLTEN_METAL) continue;
+          const sx = dx > 0 ? -1 : dx < 0 ? 1 : 0, sy = dy > 0 ? -1 : dy < 0 ? 1 : 0;
+          const tj = (ny + sy) * W + (nx + sx), to = type[tj];
+          if (to === 0 || STATE[to] === ST.GAS || STATE[to] === ST.LIQUID && to !== E.MOLTEN_METAL) { swap(j, tj); stamp[tj] = tstamp; vel[tj] = 0; }
+        }
+        return;
+      }
+      case E.BULB:
+        if (life[i] > 0) life[i]--;
+        return;
+      case E.FAN: {
+        for (let k = 14; k >= 1; k--) {
+          const yy = y - k;
+          if (yy < 1) continue;
+          const j = yy * W + x, o = type[j];
+          if (!o || INDES[o] || STATE[o] === ST.SOLID) continue;
+          const a = j - W;
+          if (type[a] === 0) { swap(j, a); stamp[a] = tstamp; vel[a] = 0; }
+        }
+        return;
+      }
+      case E.DRAIN: {
+        for (let k = 0; k < 8; k++) {
+          const nx = x + NX[k], ny = y + NY[k];
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx, o = type[j];
+          if (o && (STATE[o] === ST.LIQUID || STATE[o] === ST.GAS)) setEmpty(j);
+        }
+        return;
+      }
+      case E.MINE: {
+        for (let k = 0; k < 8; k++) {
+          const nx = x + NX[k], ny = y + NY[k];
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const o = type[ny * W + nx];
+          if (o && o !== E.MINE && (STATE[o] === ST.POWDER || STATE[o] === ST.LIQUID || o === E.BIRD || o === E.BEE)) { detonate(i, x, y, t); return; }
+        }
+        return;
+      }
+      case E.SAPLING: {
+        const ci = movePowder(i, x, y, t);
+        if (ci < 0 || lastMoved || ci + W >= N) return;
+        const b = type[ci + W];
+        if ((b === E.DIRT || b === E.MUD || b === E.SAND || b === E.GRAVEL || b === E.CLAY) && rnd() < 0.06) {
+          type[ci] = E.TRUNK; life[ci] = 14 + rint(16);
+        }
+        return;
+      }
+      case E.TRUNK: {
+        if (rnd() > 0.18) return;
+        const lf = life[i];
+        type[i] = E.WOOD;
+        stats.created[E.WOOD]++;
+        if (lf > 1 && y > 1) {
+          const j = i - W, o = type[j];
+          if (o === 0 || STATE[o] === ST.GAS || o === E.LEAF) {
+            setNew(j, E.TRUNK); life[j] = lf - 1;
+            if (lf > 6 && lf < 14 && rnd() < 0.18) {
+              const bx = x + (rnd() < 0.5 ? -1 : 1);
+              if (bx >= 0 && bx < W && type[j - W + (bx - x)] === 0) { const q = j - W + (bx - x); setNew(q, E.TRUNK); life[q] = 3 + rint(3); }
+            }
+            return;
+          }
+        }
+        // canopy
+        const r = 3 + rint(3);
+        for (let dy = -r; dy <= r; dy++) for (let dx = -r - 2; dx <= r + 2; dx++) {
+          if ((dx * dx) / 1.6 + dy * dy > r * r * (0.8 + rnd() * 0.35)) continue;
+          const nx = x + dx, ny = y + dy - 1;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const q = ny * W + nx;
+          if (type[q] === 0 || STATE[type[q]] === ST.GAS) { setNew(q, rnd() < 0.04 ? E.FLOWER : E.LEAF); stats.created[E.LEAF]++; }
+        }
+        return;
+      }
+      case E.CACTUS: {
+        if (life[i] === 0 && y < H - 1 && type[i + W] === E.SAND) life[i] = 6 + rint(9);
+        if (life[i] > 0 && rnd() < 0.05 && y > 0) {
+          const j = i - W;
+          if (type[j] === 0) {
+            setNew(j, E.CACTUS); life[j] = life[i] - 1; stats.created[E.CACTUS]++;
+            if (life[i] > 3 && life[i] < 9 && rnd() < 0.35) {
+              const ax = x + (rnd() < 0.5 ? -1 : 1);
+              if (ax >= 0 && ax < W && type[y * W + ax] === 0) { const q = y * W + ax; setNew(q, E.CACTUS); life[q] = 3; }
+            }
+            if (life[i] === 1 && y > 1 && type[j - W] === 0 && rnd() < 0.6) { setNew(j - W, E.FLOWER); shade[j - W] = 0; }
+            life[i] = -1;
+          }
+        }
+        return;
+      }
+      case E.MOSS: {
+        if (rnd() < 0.006) {
+          const n = rndNb(x, y);
+          if (n >= 0 && type[n] === 0) {
+            const nx = n % W, ny = (n / W) | 0;
+            for (let k = 1; k < 8; k += 2) {
+              const ax = nx + NX[k], ay = ny + NY[k];
+              if (ax < 0 || ay < 0 || ax >= W || ay >= H) continue;
+              const o = type[ay * W + ax];
+              if (o === E.STONE || o === E.BRICK || o === E.CONCRETE || o === E.GRAVEL || o === E.OBSIDIAN) { setNew(n, E.MOSS); stats.created[E.MOSS]++; break; }
+            }
+          }
+        }
+        return;
+      }
+      case E.ALGAE: {
+        if (rnd() < 0.004) {
+          const n = rndNb(x, y);
+          if (n >= 0 && type[n] === E.WATER) convert(n, E.ALGAE);
+        }
+        return;
+      }
+      case E.ANT: {
+        if (rnd() > 0.5) return;
+        if (life[i] === 0) life[i] = rnd() < 0.5 ? 1 : -1;
+        if (y < H - 1) {
+          const b = i + W;
+          if (type[b] === 0 || STATE[type[b]] === ST.GAS) { swap(i, b); stamp[b] = tstamp; return; }
+        }
+        const nx = x + life[i];
+        if (nx < 0 || nx >= W) { life[i] = -life[i]; return; }
+        const j = y * W + nx, o = type[j];
+        if (o === 0) { swap(i, j); stamp[j] = tstamp; return; }
+        if (y > 0 && type[j - W] === 0) { swap(i, j - W); stamp[j - W] = tstamp; return; }
+        if ((o === E.DIRT || o === E.SAND || o === E.MUD) && rnd() < 0.15) { swap(i, j); stamp[j] = tstamp; return; }
+        life[i] = -life[i];
+        return;
+      }
+      case E.WORM: {
+        let inDirt = false;
+        for (let k = 1; k < 8; k += 2) {
+          const ax = x + NX[k], ay = y + NY[k];
+          if (ax < 0 || ay < 0 || ax >= W || ay >= H) continue;
+          const o = type[ay * W + ax];
+          if (o === E.DIRT || o === E.MUD) { inDirt = true; break; }
+        }
+        if (inDirt) {
+          if (rnd() < 0.3) { const j = rndNb(x, y); if (j >= 0 && (type[j] === E.DIRT || type[j] === E.MUD)) { swap(i, j); stamp[j] = tstamp; } }
+          return;
+        }
+        movePowder(i, x, y, t);
+        return;
+      }
+      case E.BIRD: case E.PHOENIX: {
+        const fast = t === E.PHOENIX;
+        if (fast) {
+          temp[i] = 1200;
+          const n = rndNb(x, y);
+          if (n >= 0 && (type[n] === E.WATER || type[n] === E.SALTWATER)) { convert(i, E.EMBER); return; }
+        }
+        if (life[i] === 0) life[i] = rnd() < 0.5 ? 1 : -1;
+        const steps = fast ? 2 : 1;
+        let ci = i, cx = x, cy = y;
+        for (let s2 = 0; s2 < steps; s2++) {
+          if (rnd() > 0.65) continue;
+          const nx = cx + life[ci], ny = cy + (rnd() < 0.35 ? rint(3) - 1 : 0) - (cy > H - 6 ? 1 : 0);
+          if (nx < 0 || nx >= W || ny < 0 || ny >= H) { life[ci] = -life[ci]; continue; }
+          const j = ny * W + nx, o = type[j];
+          if (o === 0 || (fast && STATE[o] === ST.ENERGY)) {
+            swap(ci, j); stamp[j] = tstamp;
+            if (fast && rnd() < 0.7) { setNew(ci, E.FIRE); life[ci] = 8 + rint(12); }
+            ci = j; cx = nx; cy = ny;
+          } else life[ci] = -life[ci];
+        }
+        return;
+      }
+      case E.BEE: {
+        const n = rndNb(x, y);
+        if (n >= 0) {
+          if (type[n] === E.FLOWER && rnd() < 0.02) {
+            const j = rndNb(x, y);
+            if (j >= 0 && type[j] === 0) { setNew(j, E.HONEY); stats.created[E.HONEY]++; }
+          } else if (type[n] === 0 && rnd() < 0.5) { swap(i, n); stamp[n] = tstamp; }
+        }
+        return;
+      }
+      case E.GHOST: {
+        if (rnd() < 0.4) {
+          const k = rint(8), nx = x + NX[k], ny = y + NY[k] - (rnd() < 0.15 ? 1 : 0);
+          if (nx >= 0 && ny >= 0 && nx < W && ny < H) {
+            const j = ny * W + nx;
+            if (!INDES[type[j]] || type[j] === 0) { swap(i, j); stamp[j] = tstamp; }
+          }
+        }
+        return;
+      }
+      case E.PORTAL_B:
+        portB.push(i);
+        return;
+      case E.PORTAL_A: {
+        if (!portBPrev.length) return;
+        for (let k = 0; k < 2; k++) {
+          const n = rndNb(x, y);
+          if (n < 0) continue;
+          const o = type[n];
+          if (!o || INDES[o] || STATE[o] === ST.SOLID) continue;
+          const b = portBPrev[rint(portBPrev.length)];
+          if (type[b] !== E.PORTAL_B) continue;
+          const bx = b % W, by = (b / W) | 0;
+          for (let q = 0; q < 4; q++) {
+            const e = rndNb(bx, by);
+            if (e >= 0 && type[e] === 0) {
+              type[e] = o; shade[e] = shade[n]; life[e] = life[n]; temp[e] = temp[n]; vel[e] = vel[n]; stamp[e] = tstamp;
+              setEmpty(n);
+              break;
+            }
+          }
+        }
+        return;
+      }
+      case E.STASIS:
+        stasisL.push(i);
+        return;
+      case E.TRANSMUTER: {
+        if (life[i] === 0) {
+          const n = rndNb(x, y);
+          if (n >= 0) { const o = type[n]; if (o && !INDES[o] && o !== E.TRANSMUTER && !ELEMENTS[o].hidden) life[i] = o; }
+          return;
+        }
+        for (let k = 0; k < 3; k++) {
+          const nx = x + rint(7) - 3, ny = y + rint(7) - 3;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx, o = type[j];
+          if (o && o !== life[i] && !INDES[o] && rnd() < 0.12) { const tp2 = temp[j]; setNew(j, life[i]); if (!HAS_T0[life[i]]) temp[j] = tp2; }
+        }
+        return;
+      }
+      case E.VOLCANO: {
+        temp[i] = 1200;
+        if (y === 0 || type[i - W] !== 0) return;
+        const erupt = rnd() < 0.004;
+        const n = erupt ? 28 : (rnd() < 0.22 ? 1 : 0);
+        for (let k = 0; k < n; k++) addParticle(x, y - 1, (rnd() - 0.5) * (erupt ? 3 : 1.4), -(2 + rnd() * (erupt ? 3.5 : 2.2)), E.LAVA, rint(256), 1400, 0, 0, 0);
+        if (rnd() < 0.05) addParticle(x, y - 1, (rnd() - 0.5) * 1.6, -2 - rnd() * 2, E.EMBER, rint(256), 700, 0, 0, 0);
+        if (rnd() < 0.08) setNew(i - W, E.SMOKE);
+        if (erupt) events.push({ type: 'boom', x, y, r: 6, destroyed: 0 });
+        return;
+      }
+      case E.GEYSER: {
+        if (y === 0 || type[i - W] !== 0) return;
+        if ((tick + (i & 127)) % 160 < 26) {
+          if (rnd() < 0.7) addParticle(x, y - 1, (rnd() - 0.5) * 0.7, -(2.8 + rnd() * 1.8), E.WATER, rint(256), 60, 0, 0, 0);
+          if (rnd() < 0.3) { setNew(i - W, E.STEAM); stats.created[E.STEAM]++; }
+        }
+        return;
+      }
+      case E.SUN: {
+        halos.push(i, 1);
+        temp[i] = 6000;
+        const R = 12;
+        for (let k = 0; k < 30; k++) {
+          const dx = rint(R * 2 + 1) - R, dy = rint(R * 2 + 1) - R;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > R * R || d2 === 0) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx;
+          if (INDES[type[j]] && type[j] !== 0) continue;
+          temp[j] += 70 * (1 - Math.sqrt(d2) / R);
+          if (type[j] === 0 && d2 < 30 && rnd() < 0.03) setNew(j, E.PLASMA);
+        }
+        return;
+      }
+      case E.WHITEHOLE: {
+        halos.push(i, 2);
+        if (rnd() < 0.6) {
+          const spew = WHITE_SPEW[rint(WHITE_SPEW.length)];
+          const a = rnd() * Math.PI * 2, sp = 0.8 + rnd() * 1.8;
+          addParticle(x + Math.cos(a) * 2, y + Math.sin(a) * 2, Math.cos(a) * sp, Math.sin(a) * sp - 0.6, spew, rint(256), HAS_T0[spew] ? T0[spew] : ambient, 0, 0, 0);
+        }
+        return;
+      }
+      case E.VORTEX: {
+        halos.push(i, 3);
+        const R = 18;
+        for (let k = 0; k < 60; k++) {
+          const dx = rint(R * 2 + 1) - R, dy = rint(R * 2 + 1) - R;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < 3 || d2 > R * R) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx, o = type[j];
+          if (!o || INDES[o] || STATE[o] === ST.SOLID) continue;
+          // tangential step (counter-clockwise) with a slight inward pull
+          let sx = dy > 0 ? 1 : dy < 0 ? -1 : 0, sy = dx > 0 ? -1 : dx < 0 ? 1 : 0;
+          if (rnd() < 0.25) { sx = dx > 0 ? -1 : dx < 0 ? 1 : sx; sy = dy > 0 ? -1 : dy < 0 ? 1 : sy; }
+          const tx = nx + sx, ty = ny + sy;
+          if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
+          const tj = ty * W + tx, to = type[tj];
+          if (to === 0 || STATE[to] === ST.GAS) { swap(j, tj); stamp[tj] = tstamp; vel[tj] = 0; }
+        }
+        return;
+      }
+      case E.CRYOBOMB: {
         const ci = movePowder(i, x, y, t);
         if (ci < 0 || lastMoved) return;
         const cy = (ci / W) | 0;
         const below = cy + 1 < H ? type[ci + W] : -1;
-        if (below !== E.BOMB && below !== E.NUKE && below !== 0) detonate(ci, ci % W, cy, t);
+        if (below !== 0 && below !== E.CRYOBOMB) cryoBlast(ci, ci % W, cy);
+        return;
+      }
+      case E.BOMB: case E.NUKE: case E.CLUSTERBOMB: case E.BOMBLET: {
+        const ci = movePowder(i, x, y, t);
+        if (ci < 0 || lastMoved) return;
+        const cy = (ci / W) | 0;
+        const below = cy + 1 < H ? type[ci + W] : -1;
+        if (below !== E.BOMB && below !== E.NUKE && below !== E.BOMBLET && below !== E.CLUSTERBOMB && below !== 0) detonate(ci, ci % W, cy, t);
         return;
       }
     }
@@ -1009,7 +1543,25 @@ const Sim = (() => {
     tick++;
     tstamp = (tstamp + 1) & 255; if (tstamp === 0) tstamp = 1;
     blackholes.length = 0;
+    halos.length = 0;
+    portBPrev = portB; portB = [];
+    stasisPrev = stasisL; stasisL = [];
     heatPass();
+    // stasis fields freeze everything around them for this tick
+    for (let n = 0; n < stasisPrev.length; n++) {
+      const i = stasisPrev[n];
+      if (type[i] !== E.STASIS) continue;
+      const cx = i % W, cy = (i / W) | 0;
+      for (let dy = -5; dy <= 5; dy++) {
+        const y = cy + dy; if (y < 0 || y >= H) continue;
+        for (let dx = -5; dx <= 5; dx++) {
+          const x = cx + dx; if (x < 0 || x >= W || dx * dx + dy * dy > 26) continue;
+          const j = y * W + x;
+          if (type[j] !== E.STASIS) stamp[j] = tstamp;
+        }
+      }
+      stamp[i] = 0;
+    }
     for (let y = H - 1; y >= 0; y--) {
       const row = y * W;
       const ltr = ((y + tick) & 1) === 0;
@@ -1163,7 +1715,7 @@ const Sim = (() => {
 
   return {
     init, clear, step, paint, heatBrush, mixBrush, snapshot, restore, copyRegion, pasteRegion, fillRegion,
-    serialize, deserialize, countNonEmpty, explode, setNew, stats, events, blackholes, hsl,
+    serialize, deserialize, countNonEmpty, explode, setNew, stats, events, blackholes, halos, hsl,
     get W() { return W; }, get H() { return H; }, get tick() { return tick; },
     get type() { return type; }, get shade() { return shade; }, get life() { return life; },
     get temp() { return temp; }, get charge() { return charge; },

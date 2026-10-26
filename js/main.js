@@ -113,6 +113,7 @@
         combo.n += Math.min(3, booms);
         combo.t = combo.max;
         Progress.reportCombo(combo.n);
+        UI.updateBestCombo();
         if (combo.n > 2) Sfx.combo(combo.n);
         if (now - lastPop > 140 && (destroyed > 6 || maxR >= 8)) {
           lastPop = now;
@@ -137,6 +138,7 @@
         const bonus = Math.min(80, Math.floor(combo.n / 5) * 4);
         UI.toast({ k: 'COMBO FINISHED', n: 'x' + combo.n + ' chain!', xp: bonus, c: 'var(--yellow)', life: 2 });
         Progress.addXp(bonus, 'Combo');
+        if (combo.n >= 10) Progress.addAtoms(Math.min(60, Math.floor(combo.n / 10) * 3), 'Combo');
       }
       combo.n = 0;
     }
@@ -205,6 +207,7 @@
   /* --------------------------------------------------------------------- */
   /*  Boot                                                                  */
   /* --------------------------------------------------------------------- */
+  const BOOT_T = performance.now();
   async function boot() {
     await Platform.init();
     Platform.loadingStart();
@@ -251,7 +254,7 @@
       Sim.init(w, h);
       starterScene();
       // let the world settle before anything counts toward discoveries
-      for (let k = 0; k < 200; k++) Sim.step();
+      for (let k = 0; k < 120; k++) Sim.step();
       const ty = Sim.type, W = Sim.W, N = W * Sim.H;
       for (let i = 0; i < N; i++) {
         if (ty[i] === E.MUD) Sim.setNew(i, E.SAND);
@@ -288,10 +291,13 @@
       UI.renderMissions();
       document.getElementById('missionDot').classList.remove('hidden');
     });
-    Progress.on('xp', () => UI.updateXp());
+    Progress.on('xp', n => { UI.updateXp(); UI.xpPop(n); });
+    Progress.on('atoms', n => { UI.updateAtoms(); if (n) UI.atomPop(n); });
     Progress.on('change', () => UI.updateXp());
 
     UI.updateXp();
+    UI.updateAtoms();
+    UI.updateBestCombo();
     UI.renderMissions();
     UI.selectElement(E.SAND);
 
@@ -301,8 +307,11 @@
     });
 
     const loader = document.getElementById('loader');
-    loader.classList.add('out');
-    setTimeout(() => loader.remove(), 500);
+    // keep the flashing-lights notice up just long enough to read
+    const shownFor = performance.now() - BOOT_T;
+    setTimeout(() => { loader.classList.add('out'); setTimeout(() => loader.remove(), 250); }, Math.max(0, 900 - shownFor));
+    const daily = Progress.dailyPending();
+    if (daily) setTimeout(() => UI.openDaily(daily), fresh ? 2500 : 1200);
     Platform.loadingStop();
 
     if (fresh) {

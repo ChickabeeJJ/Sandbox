@@ -84,6 +84,11 @@ const UI = (() => {
     });
 
     $('btnMenu').onclick = openMenu;
+    $('btnShop').onclick = () => openShop('elements');
+    $('atomBox').onclick = () => openShop('elements');
+    $('btnSaves').onclick = () => openSlots();
+    $('btnSaveR').onclick = () => openSlots('save');
+    $('btnLoadR').onclick = () => openSlots('load');
     $('btnCodex').onclick = openCodex;
     $('btnMissionsM').onclick = openMissionsModal;
     $('btnSound').onclick = () => {
@@ -112,6 +117,7 @@ const UI = (() => {
       <div class="mb-sep"></div>
       ${TOOLS.filter(t => t[0] !== 'pick').map(([id]) => `<button class="mb-btn" data-m="tool" data-tool="${id}">${icon(id)}</button>`).join('')}
       <div class="mb-sep"></div>
+      <button class="mb-btn" data-m="saves">${icon('save')}</button>
       <button class="mb-btn" data-m="undo">${icon('undo')}</button>
       <button class="mb-btn" data-m="fit" id="mbFit">${icon('fit')}</button>
       <button class="mb-btn" data-m="temp" id="mbTemp">22°</button>
@@ -126,6 +132,7 @@ const UI = (() => {
       else if (m === 'brush') { const i = BRUSHES.findIndex(x => x[0] === s.brush); setBrush(BRUSHES[(i + 1) % BRUSHES.length][0]); }
       else if (m === 'tool') setTool(s.tool === b.dataset.tool ? 'draw' : b.dataset.tool);
       else if (m === 'undo') undo();
+      else if (m === 'saves') openSlots();
       else if (m === 'fit') fitView();
       else if (m === 'temp') { s.tempIdx = (s.tempIdx + 1) % TEMPS.length; updateSettings(); }
       else if (m === 'speed') { s.speedIdx = (s.speedIdx + 1) % SPEEDS.length; updateSettings(); }
@@ -160,7 +167,11 @@ const UI = (() => {
         b.style.setProperty('--glow', d.col[0]);
         b.innerHTML = `<span class="el-name">${d.name}</span>` + (!st.tried[d.key] && d.unlock !== 'base' ? '<span class="badge-new">NEW</span>' : '');
       } else {
-        b.innerHTML = `<span class="el-name">${icon('lock')}${d.unlock.lvl && !d.unlock.disc ? 'LV ' + d.unlock.lvl : '???'}</span>`;
+        const lbl = d.unlock.cost ? `<span class="atom-cost">${icon('atom')}${d.unlock.cost}</span>`
+          : d.unlock.via ? `<span class="atom-cost">${icon('atom')}${ELEMENTS[E[d.unlock.via]].unlock.cost}</span>`
+          : `${icon('lock')}${d.unlock.lvl && !d.unlock.disc ? 'LV ' + d.unlock.lvl : '???'}`;
+        b.innerHTML = `<span class="el-name">${lbl}</span>`;
+        if (d.unlock.cost || d.unlock.via) b.classList.add('shop-item');
       }
       if (animateId === d.id) b.classList.add('unlock-anim');
       b.onclick = () => {
@@ -180,6 +191,8 @@ const UI = (() => {
   function lockText(id) {
     const r = Progress.unlockReq(id);
     const parts = [];
+    if (r.cost) return `Buy in the Shop for ${r.cost} atoms`;
+    if (r.via) return `Comes with ${ELEMENTS[E[r.via]].name} in the Shop`;
     if (r.disc) parts.push('Discover: ' + r.disc);
     if (r.lvl) parts.push('or reach Level ' + r.lvl);
     return parts.join('<br>').replace(/^or /, '');
@@ -449,6 +462,9 @@ const UI = (() => {
     if (gx < 0 || gy < 0 || gx >= Sim.W || gy >= Sim.H) return;
     let t = Sim.type[gy * Sim.W + gx];
     if (t === E.TBURN) t = E.THERMITE;
+    else if (t === E.TRUNK) t = E.WOOD;
+    else if (t === E.BOMBLET) t = E.CLUSTERBOMB;
+    else if (t === E.COLORSMOKE) t = E.SMOKEBOMB;
     if (t && Progress.isUnlocked(t)) {
       selectElement(t);
       revealInPalette(t);
@@ -636,14 +652,29 @@ const UI = (() => {
   /* ====================================================================== */
   /*  HUD: XP, missions, combo                                               */
   /* ====================================================================== */
+  let shownLevel = 0;
   function updateXp() {
     const st = Progress.state;
     const need = Progress.xpForLevel(st.level);
     const pct = Math.min(100, st.xp / need * 100);
+    const fill = $('xpFill'), ghost = $('xpGhost');
     $('lvlNum').textContent = st.level;
-    $('xpFill').style.width = pct + '%';
-    $('xpGhost').style.width = pct + '%';
-    $('xpText').textContent = `${st.xp} / ${need} XP`;
+    if (shownLevel && st.level > shownLevel) {
+      // finish the old bar, then snap back and grow into the new level
+      fill.style.width = '100%'; ghost.style.width = '100%';
+      setTimeout(() => {
+        fill.style.transition = ghost.style.transition = 'none';
+        fill.style.width = ghost.style.width = '0%';
+        void fill.offsetWidth;
+        fill.style.transition = ghost.style.transition = '';
+        fill.style.width = ghost.style.width = Math.min(100, Progress.state.xp / Progress.xpForLevel(Progress.state.level) * 100) + '%';
+      }, 520);
+    } else {
+      fill.style.width = pct + '%';
+      ghost.style.width = pct + '%';
+    }
+    shownLevel = st.level;
+    $('xpText').textContent = `${fmt(st.xp)} / ${fmt(need)} XP`;
     $('discText').textContent = `${Progress.discoveredCount} / ${Progress.visible.length} found`;
   }
 
@@ -654,7 +685,7 @@ const UI = (() => {
       <div class="m-sw" style="background:${sw}"></div>
       <div class="m-text">${m.text}</div>
       <div class="m-bar"><i style="width:${pct}%"></i></div>
-      <div class="m-meta"><span>${fmt(Math.min(m.progress, m.goal))} / ${fmt(m.goal)}</span><b>+${m.reward} XP</b></div>
+      <div class="m-meta"><span>${fmt(Math.min(m.progress, m.goal))} / ${fmt(m.goal)}</span><b>+${fmt(m.reward)} XP · ${fmt(m.atoms || 0)}<i class="mi-atom">${icon('atom')}</i></b></div>
       ${m.done ? '' : `<button class="m-reroll" data-reroll="${idx}" title="Swap mission">${icon('reroll')}</button>`}
     </div>`;
   }
@@ -805,8 +836,8 @@ const UI = (() => {
       <div class="set-row"><div><label>Light mode</label><small>Dark is the default</small></div><button class="switch ${set.theme === 'light' ? 'on' : ''}" id="mTheme"></button></div>
       <div class="set-row"><div><label>Screen shake</label></div><button class="switch ${set.shake ? 'on' : ''}" id="mShake"></button></div>
       <div class="btn-row">
-        <button class="btn" id="mSave">${icon('save')} Save creation</button>
-        <button class="btn ghost" id="mLoad">${icon('load')} Load creation</button>
+        <button class="btn" id="mSave">${icon('save')} Save slots</button>
+        <button class="btn ghost" id="mShop">${icon('bag')} Shop</button>
       </div>
       <div class="btn-row">
         <button class="btn yellow" id="mHelp">How to play</button>
@@ -827,15 +858,8 @@ const UI = (() => {
         Progress.save();
       };
       card.querySelector('#mShake').onclick = e => { set.shake = !set.shake; e.currentTarget.classList.toggle('on', set.shake); Progress.save(); };
-      card.querySelector('#mSave').onclick = () => { Platform.setItem('slot1', JSON.stringify(Sim.serialize())); toast({ k: 'SAVED', n: 'Creation saved', c: 'var(--lime)', life: 1.8 }); Sfx.mission(); };
-      card.querySelector('#mLoad').onclick = () => {
-        const raw = Platform.getItem('slot1');
-        if (!raw) { toast({ k: 'NOTHING HERE', n: 'Save a creation first', c: 'var(--orange)', life: 1.8 }); Sfx.denied(); return; }
-        pushUndo();
-        try { Sim.deserialize(JSON.parse(raw)); layout(); } catch (e) { /* ignore */ }
-        closeModal();
-        toast({ k: 'LOADED', n: 'Creation restored', c: 'var(--lime)', life: 1.8 });
-      };
+      card.querySelector('#mSave').onclick = () => { closeModal(); setTimeout(openSlots, 150); };
+      card.querySelector('#mShop').onclick = () => { closeModal(); setTimeout(() => openShop('elements'), 150); };
       card.querySelector('#mHelp').onclick = () => { closeModal(); setTimeout(openHelp, 150); };
       card.querySelector('#mReset').onclick = () => {
         const b = card.querySelector('#mReset');
@@ -905,8 +929,10 @@ const UI = (() => {
   }
 
   function showLocked(id) {
-    const d = ELEMENTS[id];
-    const r = Progress.unlockReq(id);
+    let d = ELEMENTS[id];
+    let r = Progress.unlockReq(id);
+    if (r.via) { id = E[r.via]; d = ELEMENTS[id]; r = Progress.unlockReq(id); }
+    if (r.cost) { openShop('elements', id); return; }
     const lvl = Progress.state.level;
     openModal(`
       <div class="el-card">
@@ -934,7 +960,220 @@ const UI = (() => {
     } });
   }
 
-  /* several level-ups in a row collapse into one celebration */
+  /* ====================================================================== */
+  /*  Atoms, shop, save slots, daily bonus                                   */
+  /* ====================================================================== */
+  const atomIcon = () => `<span class="ai">${icon('atom')}</span>`;
+  function updateBestCombo() {
+    $('bestCombo').innerHTML = `Highest combo <b>x${fmt(Progress.state.bestCombo || 0)}</b>`;
+  }
+  function updateAtoms() {
+    $('atomNum').textContent = fmt(Progress.state.atoms);
+  }
+  function atomPop(n) {
+    const box = $('atomBox');
+    box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump');
+    floatText(box, (n > 0 ? '+' : '-') + fmt(Math.abs(n)), n > 0 ? 'var(--cyan)' : 'var(--pink)');
+  }
+  function xpPop(n) {
+    floatText($('xpFill').parentElement, '+' + fmt(n) + ' XP', 'var(--yellow)');
+  }
+  function floatText(anchor, text, color) {
+    const r = anchor.getBoundingClientRect();
+    const d = document.createElement('div');
+    d.className = 'float-txt';
+    d.textContent = text;
+    d.style.color = color;
+    d.style.left = (r.left + r.width / 2) + 'px';
+    d.style.top = (r.bottom + 4) + 'px';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 1200);
+  }
+
+  function shopElementCard(d, focus) {
+    const owned = Progress.isEarned(d.id);
+    const cost = d.unlock.cost;
+    const can = Progress.state.atoms >= cost;
+    const name = d.unlock.also ? d.name.replace(' In', '') + ' Pair' : d.name;
+    return `<div class="shop-card${owned ? ' owned' : ''}${focus ? ' focus' : ''}" data-buy="${d.id}">
+      <div class="shop-sw" style="background:${Renderer.swatchCss(d.id)}"></div>
+      <div class="shop-info"><b>${name}</b><span>${d.desc}</span></div>
+      <button class="btn ${owned ? 'ghost' : can ? 'yellow' : 'ghost'} shop-buy" ${owned ? 'disabled' : ''}>${owned ? 'Owned' : atomIcon() + cost}</button>
+    </div>`;
+  }
+
+  function openShop(tab, focusId) {
+    Sfx.click();
+    tab = tab || 'elements';
+    const st = Progress.state;
+    const items = ELEMENTS.filter(d => !d.hidden && d.unlock && d.unlock.cost).sort((a, b) => a.unlock.cost - b.unlock.cost);
+    const slotP = Progress.slotPrice();
+    const adIn = Progress.adReadyIn();
+    const daily = Progress.dailyPending();
+    const body = tab === 'elements'
+      ? `<div class="shop-grid">${items.map(d => shopElementCard(d, d.id === focusId)).join('')}</div>`
+      : tab === 'slots'
+      ? `<div class="shop-slots">
+          <div class="big-num">${st.slots}<small> / ${Progress.MAX_SLOTS} save slots</small></div>
+          <p>More slots let you keep more of your sandboxes.</p>
+          <div class="btn-row" style="justify-content:center">${slotP == null ? '<button class="btn ghost" disabled>Maxed out!</button>'
+            : `<button class="btn ${st.atoms >= slotP ? 'yellow' : 'ghost'}" id="buySlot">Buy a slot · ${atomIcon()}${slotP}</button>`}</div>
+        </div>`
+      : `<div class="shop-free">
+          <div class="free-row"><div class="free-ic">${icon('ad')}</div><div><b>Watch an ad</b><span>Get ${Progress.AD_ATOMS} atoms</span></div>
+            <button class="btn yellow" id="adAtoms" ${adIn ? 'disabled' : ''}>${adIn ? 'Ready in ' + Math.ceil(adIn / 60000) + 'm' : 'Watch'}</button></div>
+          <div class="free-row"><div class="free-ic">${icon('gift')}</div><div><b>Daily bonus</b><span>${daily ? `Day ${daily.streak} streak · ${daily.amount} atoms` : 'Come back tomorrow for a bigger bonus'}</span></div>
+            <button class="btn ${daily ? 'yellow' : 'ghost'}" id="claimDaily" ${daily ? '' : 'disabled'}>${daily ? 'Claim' : 'Claimed'}</button></div>
+          <div class="earn-list">
+            <b>Other ways to earn atoms</b>
+            <span>${atomIcon()} Complete missions</span><span>${atomIcon()} Level up</span><span>${atomIcon()} Discover new elements</span>
+            <span>${atomIcon()} Big blast combos</span><span>${atomIcon()} Blow stuff up (every 2,500 pixels)</span>
+          </div>
+        </div>`;
+    const html = `<h2>Shop</h2>
+      <div class="shop-head"><div class="shop-tabs">
+        <button class="${tab === 'elements' ? 'on' : ''}" data-tab="elements">Elements</button>
+        <button class="${tab === 'slots' ? 'on' : ''}" data-tab="slots">Save slots</button>
+        <button class="${tab === 'free' ? 'on' : ''}" data-tab="free">Free atoms</button></div>
+        <div class="atom-bal">${atomIcon()}<b>${fmt(st.atoms)}</b></div></div>
+      ${body}`;
+    const bind = card => {
+      card.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => rerender(b.dataset.tab));
+      card.querySelectorAll('[data-buy]').forEach(c => c.querySelector('.shop-buy').onclick = () => {
+        const id = +c.dataset.buy;
+        if (Progress.buyElement(id)) {
+          Sfx.levelup(); renderPalette(id);
+          closeModal(); selectElement(id); revealInPalette(id);
+        } else { Sfx.denied(); toast({ k: 'NOT ENOUGH ATOMS', n: 'Check Free atoms for more', c: 'var(--orange)', life: 2 }); }
+      });
+      const bs = card.querySelector('#buySlot');
+      if (bs) bs.onclick = () => {
+        if (Progress.buySlot()) { Sfx.mission(); rerender('slots'); toast({ k: 'NEW SAVE SLOT', n: `You now have ${Progress.state.slots} slots`, c: 'var(--lime)', life: 2 }); }
+        else { Sfx.denied(); toast({ k: 'NOT ENOUGH ATOMS', n: 'Check Free atoms for more', c: 'var(--orange)', life: 2 }); }
+      };
+      const ad = card.querySelector('#adAtoms');
+      if (ad) ad.onclick = () => {
+        Platform.requestAd('rewarded', ok => {
+          if (ok) { Progress.adReward(); Sfx.mission(); }
+          else toast({ k: 'NO AD AVAILABLE', n: 'Try again in a bit', c: 'var(--orange)', life: 2 });
+          if (s.modalKind === 'shop') rerender('free');
+        });
+      };
+      const cd = card.querySelector('#claimDaily');
+      if (cd) cd.onclick = () => { if (Progress.claimDaily()) { Sfx.mission(); rerender('free'); } };
+      const f = card.querySelector('.shop-card.focus');
+      if (f) f.scrollIntoView({ block: 'center' });
+    };
+    function rerender(t) {
+      tab = t;
+      if (s.modalOpen && s.modalKind === 'shop') { closeModalSilently(); }
+      openShop(t, focusId);
+    }
+    openModal(html, { wide: true, kind: 'shop', bind });
+  }
+  function closeModalSilently() {
+    s.modalOpen = false; s.modalKind = null;
+    $('modal').classList.add('hidden');
+  }
+
+  /* -------------------------------- save slots ---------------------------- */
+  function slotKey(i) { return 'slot_' + i; }
+  function readSlot(i) {
+    try { const raw = Platform.getItem(slotKey(i)); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function makeThumb() {
+    const src = document.getElementById('cvMain');
+    const w = 160, h = Math.max(40, Math.round(160 * src.height / src.width));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.drawImage(src, 0, 0, w, h);
+    try { return c.toDataURL('image/jpeg', 0.75); } catch (e) { return ''; }
+  }
+  function openSlots(mode) {
+    Sfx.click();
+    mode = mode === 'save' || mode === 'load' ? mode : 'both';
+    // migrate the old single save slot
+    const legacy = Platform.getItem('slot1');
+    if (legacy && !readSlot(0)) {
+      try { Platform.setItem(slotKey(0), JSON.stringify({ name: 'Sandbox 1', t: Date.now(), thumb: '', data: JSON.parse(legacy) })); Platform.removeItem('slot1'); } catch (e) { /* ignore */ }
+    }
+    const st = Progress.state;
+    let html = `<h2>${mode === 'save' ? 'Save to which slot?' : mode === 'load' ? 'Load which slot?' : 'Save slots'}</h2><div class="slot-grid">`;
+    for (let i = 0; i < st.slots; i++) {
+      const sl = readSlot(i);
+      html += sl ? `<div class="slot" data-slot="${i}">
+          <div class="slot-thumb">${sl.thumb ? `<img src="${sl.thumb}" alt="">` : icon('save')}</div>
+          <input class="slot-name" value="${(sl.name || 'Sandbox ' + (i + 1)).replace(/"/g, '&quot;')}" maxlength="24" spellcheck="false">
+          <div class="slot-date">${new Date(sl.t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="slot-btns">${mode !== 'save' ? '<button class="btn" data-act="load">Load</button>' : ''}${mode !== 'load' ? `<button class="btn ${mode === 'save' ? 'yellow' : 'ghost'}" data-act="save">Overwrite</button>` : ''}<button class="btn ghost danger-txt" data-act="del">✕</button></div>
+        </div>`
+        : `<div class="slot empty" data-slot="${i}">
+          <div class="slot-thumb">${icon('save')}</div>
+          <div class="slot-name">Empty slot ${i + 1}</div>
+          <div class="slot-date">&nbsp;</div>
+          <div class="slot-btns">${mode === 'load' ? '<button class="btn ghost" disabled>Empty</button>' : '<button class="btn yellow" data-act="save">Save here</button>'}</div>
+        </div>`;
+    }
+    const p = Progress.slotPrice();
+    if (p != null) html += `<div class="slot locked-slot" id="slotBuy"><div class="slot-thumb">${icon('lock')}</div><div class="slot-name">Unlock a slot</div><div class="slot-date">&nbsp;</div>
+      <div class="slot-btns"><button class="btn ${st.atoms >= p ? 'yellow' : 'ghost'}">${atomIcon()}${p}</button></div></div>`;
+    html += '</div>';
+    openModal(html, { wide: true, kind: 'slots', bind: card => {
+      card.querySelectorAll('.slot[data-slot]').forEach(el => {
+        const i = +el.dataset.slot;
+        const name = el.querySelector('input.slot-name');
+        if (name) {
+          name.addEventListener('keydown', e => e.stopPropagation());
+          name.onchange = () => { const sl = readSlot(i); if (sl) { sl.name = name.value.trim() || 'Sandbox ' + (i + 1); Platform.setItem(slotKey(i), JSON.stringify(sl)); } };
+        }
+        el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => {
+          const act = b.dataset.act;
+          if (act === 'save') {
+            if (readSlot(i) && !b.dataset.armed) { b.dataset.armed = 1; b.textContent = 'Sure?'; return; }
+            const prev = readSlot(i);
+            const rec = { name: prev ? prev.name : 'Sandbox ' + (i + 1), t: Date.now(), thumb: makeThumb(), data: Sim.serialize() };
+            try { Platform.setItem(slotKey(i), JSON.stringify(rec)); }
+            catch (e) { toast({ k: 'STORAGE FULL', n: 'Delete a slot and try again', c: 'var(--orange)', life: 2.4 }); return; }
+            Sfx.mission();
+            toast({ k: 'SAVED', n: rec.name, c: 'var(--lime)', life: 1.8 });
+            closeModalSilently(); openSlots(mode);
+          } else if (act === 'load') {
+            const sl = readSlot(i);
+            if (!sl) return;
+            pushUndo();
+            try { Sim.deserialize(sl.data); s.undo.length = 0; layout(); } catch (e) { /* ignore */ }
+            closeModal();
+            toast({ k: 'LOADED', n: sl.name, c: 'var(--lime)', life: 1.8 });
+          } else if (act === 'del') {
+            if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = 'Delete?'; return; }
+            Platform.removeItem(slotKey(i));
+            Sfx.erase();
+            closeModalSilently(); openSlots(mode);
+          }
+        });
+      });
+      const buy = card.querySelector('#slotBuy button');
+      if (buy) buy.onclick = () => {
+        if (Progress.buySlot()) { Sfx.mission(); closeModalSilently(); openSlots(mode); }
+        else { Sfx.denied(); toast({ k: 'NOT ENOUGH ATOMS', n: 'Earn more from missions & the shop', c: 'var(--orange)', life: 2 }); }
+      };
+    } });
+  }
+
+  function openDaily(d) {
+    openModal(`
+      <div class="levelup">
+        <div class="lu-k">DAILY BONUS</div>
+        <div class="daily-ic">${icon('gift')}</div>
+        <p>Day <b style="color:var(--yellow)">${d.streak}</b> streak${d.streak < 7 ? ' - come back tomorrow for more!' : ' - max streak!'}</p>
+        <div class="streak">${[1, 2, 3, 4, 5, 6, 7].map(k => `<i class="${k <= d.streak ? 'on' : ''}">${k}</i>`).join('')}</div>
+        <div class="btn-row" style="justify-content:center"><button class="btn yellow" id="dClaim">Claim ${atomIcon()}${d.amount}</button></div>
+      </div>`, { noX: true, kind: 'daily', bind: card => {
+      card.querySelector('#dClaim').onclick = () => { Progress.claimDaily(); Sfx.mission(); closeModal(); };
+    } });
+  }
+
+    /* several level-ups in a row collapse into one celebration */
   let lu = null;
   function showLevelUp(level, fresh) {
     if (lu) {
@@ -991,13 +1230,23 @@ const UI = (() => {
     Renderer.setTheme(mode);
   }
 
-  const fmt = n => n >= 10000 ? (n / 1000).toFixed(1) + 'k' : Math.floor(n).toLocaleString();
+  /* 999 -> 999, 1234 -> 1.23k, 56789 -> 56.8k, 1.2e6 -> 1.2m, 3e9 -> 3b */
+  function fmt(n) {
+    n = Math.floor(n);
+    const a = Math.abs(n);
+    const short = v => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)).replace(/\.?0+$/, '');
+    if (a >= 1e12) return short(n / 1e12) + 't';
+    if (a >= 1e9) return short(n / 1e9) + 'b';
+    if (a >= 1e6) return short(n / 1e6) + 'm';
+    if (a >= 1e3) return short(n / 1e3) + 'k';
+    return '' + n;
+  }
 
   return {
     build, layout, applyInput, drawOverlay, updateHover, renderPalette, selectElement, revealInPalette,
     updateXp, renderMissions, updateMissionBars, setCombo, pop, toast, shake, tickShake, flash,
     openModal, closeModal, openHelp, showLevelUp, pushUndo, fitView,
-    isTouch, applyTheme,
+    isTouch, applyTheme, fmt, updateBestCombo, updateAtoms, atomPop, xpPop, openShop, openSlots, openDaily,
     get state() { return s; },
     get speed() { return SPEEDS[s.speedIdx]; },
     get canvasCells() { return CANVASES[s.canvasIdx].cells; },

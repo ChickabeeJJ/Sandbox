@@ -9,10 +9,10 @@ const Progress = (() => {
   const VISIBLE = ELEMENTS.filter(d => !d.hidden);
   const st = {
     xp: 0, level: 1, unlocked: {}, tried: {}, missions: [], tutorial: 0,
-    rerollAt: 0, totalMissions: 0, bestCombo: 0, destroyedXpAcc: 0,
+    rerollAt: 0, atoms: 60, slots: 3, daily: { last: '', streak: 0 }, adAt: 0, placedAcc: 0, atomDestroyAcc: 0, totalMissions: 0, bestCombo: 0, destroyedXpAcc: 0,
     settings: { sfx: 0.8, music: 0.35, muted: false, glow: true, shake: true, theme: 'dark' },
   };
-  const cb = { discover: [], levelup: [], mission: [], xp: [], change: [] };
+  const cb = { discover: [], levelup: [], mission: [], xp: [], change: [], atoms: [] };
   const emit = (k, ...a) => cb[k].forEach(f => f(...a));
   let lastStats = null;
   let dirty = false;
@@ -30,7 +30,7 @@ const Progress = (() => {
   function unlockReq(id) {
     const d = ELEMENTS[id];
     if (d.unlock === 'base') return null;
-    return { lvl: d.unlock.lvl || null, disc: d.unlock.disc || null };
+    return { lvl: d.unlock.lvl || null, disc: d.unlock.disc || null, cost: d.unlock.cost || null, via: d.unlock.via || null };
   }
 
   function addXp(n, reason) {
@@ -48,6 +48,7 @@ const Progress = (() => {
         }
       });
       emit('levelup', st.level, fresh);
+      addAtoms(40 + 10 * st.level, 'Level up');
       need = xpForLevel(st.level);
     }
     save();
@@ -61,6 +62,7 @@ const Progress = (() => {
     const xp = 40 + 8 * Math.min(st.level, 12);
     emit('discover', d, xp);
     bump('discover', 1);
+    addAtoms(12, 'Discovery');
     addXp(xp, 'Discovery');
   }
 
@@ -121,6 +123,11 @@ const Progress = (() => {
     { id: 'rust', w: 1, req: () => st.level >= 3, make: s => { const n = nice(30 * s); return T('c:RUST', n, `Rust ${n} metal pixels`, 30, 'RUST'); } },
     { id: 'molten', w: 1, req: () => has('THERMITE'), make: s => { const n = nice(40 * s); return T('c:MOLTEN_METAL', n, `Melt ${n} Metal`, 30, 'MOLTEN_METAL'); } },
     { id: 'fungus', w: 1, req: () => has('FUNGUS'), make: s => { const n = nice(120 * s); return T('c:FUNGUS', n, `Spread ${n} Fungus`, 10, 'FUNGUS'); } },
+    { id: 'gold', w: 1, req: () => has('LEAD') && has('LIGHTNING'), make: () => T('c:GOLD', 20, 'Turn Lead into Gold with Lightning', 60, 'GOLD') },
+    { id: 'brick', w: 1, req: () => has('CLAY'), make: s => { const n = nice(50 * s); return T('c:BRICK', n, `Bake ${n} Clay into Brick`, 30, 'BRICK'); } },
+    { id: 'concrete', w: 1, req: () => has('CEMENT'), make: s => { const n = nice(80 * s); return T('c:CONCRETE', n, `Set ${n} Concrete with water`, 20, 'CONCRETE'); } },
+    { id: 'bubbles', w: 1, req: () => has('SOAP'), make: s => { const n = nice(60 * s); return T('c:BUBBLE', n, `Blow ${n} bubbles with Soap`, 30, 'BUBBLE'); } },
+    { id: 'honey', w: 1, req: () => has('BEE') || has('SUGAR'), make: s => { const n = nice(40 * s); return T('c:HONEY', n, `Make ${n} Honey`, 30, 'HONEY'); } },
     { id: 'discover', w: 2, req: () => VISIBLE.some(d => !isEarned(d.id) && d.unlock.disc), make: () => T('discover', 1, 'Discover a new element', 40, 'GLITTER') },
   ];
 
@@ -141,6 +148,7 @@ const Progress = (() => {
     m.tid = tid;
     m.progress = 0;
     m.reward = Math.round(55 + st.level * 14 + (m.reward || 0));
+    m.atoms = 15 + st.level * 3;
     m.done = false;
     return m;
   }
@@ -165,6 +173,7 @@ const Progress = (() => {
     st.totalMissions++;
     emit('mission', m);
     addXp(m.reward, 'Mission');
+    addAtoms(m.atoms, 'Mission');
     setTimeout(() => {
       const idx = st.missions.indexOf(m);
       if (idx >= 0) { st.missions.splice(idx, 1, newMission()); save(); emit('change'); }
@@ -199,10 +208,10 @@ const Progress = (() => {
       const dp = s.placed[t] - lastStats.placed[t];
       if (dc > 0) {
         const d = ELEMENTS[t];
-        if (!d.hidden && d.unlock !== 'base' && !st.unlocked[d.key]) discover(d, 'disc');
+        if (!d.hidden && d.unlock !== 'base' && !d.unlock.cost && !d.unlock.via && !st.unlocked[d.key]) discover(d, 'disc');
         bump('c:' + d.key, dc);
       }
-      if (dp > 0) { bump('p:' + ELEMENTS[t].key, dp); noteTried(t); }
+      if (dp > 0) { bump('p:' + ELEMENTS[t].key, dp); noteTried(t); st.placedAcc += dp; }
     }
     STAT_KEYS.forEach(k => {
       const d = s[k] - lastStats[k];
@@ -212,6 +221,11 @@ const Progress = (() => {
     if (dd > 0) {
       st.destroyedXpAcc += dd;
       if (st.destroyedXpAcc >= 500) { const n = Math.floor(st.destroyedXpAcc / 500); st.destroyedXpAcc -= n * 500; addXp(n * 6, 'Destruction'); }
+    }
+    if (st.placedAcc >= 1500) { const n = Math.floor(st.placedAcc / 1500); st.placedAcc -= n * 1500; addXp(n * 4, 'Experimenting'); }
+    if (dd > 0) {
+      st.atomDestroyAcc += dd;
+      if (st.atomDestroyAcc >= 2500) { const n = Math.floor(st.atomDestroyAcc / 2500); st.atomDestroyAcc -= n * 2500; addAtoms(n * 5, 'Destruction'); }
     }
     lastStats.created.set(s.created); lastStats.placed.set(s.placed);
     STAT_KEYS.forEach(k => lastStats[k] = s[k]);
@@ -251,8 +265,63 @@ const Progress = (() => {
   }
 
 
+  /* ------------------------------ atoms (currency) ---------------------- */
+  const SLOT_PRICES = [300, 500, 800, 1200, 1600, 2000, 2600, 3200, 4000];
+  const MAX_SLOTS = 12;
+  const AD_ATOMS = 75, AD_COOLDOWN = 3 * 60 * 1000;
+
+  function addAtoms(n, reason) {
+    if (n <= 0) return;
+    st.atoms += n;
+    emit('atoms', n, reason);
+    saveSoon();
+  }
+  function spend(n) {
+    if (st.atoms < n) return false;
+    st.atoms -= n;
+    emit('atoms', -n, 'spend');
+    save();
+    return true;
+  }
+  function buyElement(id) {
+    const d = ELEMENTS[id];
+    if (!d.unlock || !d.unlock.cost || st.unlocked[d.key]) return false;
+    if (!spend(d.unlock.cost)) return false;
+    st.unlocked[d.key] = 'shop';
+    (d.unlock.also || []).forEach(k => { st.unlocked[k] = 'shop'; });
+    emit('discover', d, 0);
+    save(); emit('change');
+    return true;
+  }
+  const slotPrice = () => st.slots >= MAX_SLOTS ? null : SLOT_PRICES[st.slots - 3];
+  function buySlot() {
+    const p = slotPrice();
+    if (p == null || !spend(p)) return false;
+    st.slots++;
+    save(); emit('change');
+    return true;
+  }
+  const today = () => new Date().toISOString().slice(0, 10);
+  function dailyPending() {
+    if (st.daily.last === today()) return null;
+    const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    const streak = st.daily.last === y ? Math.min(7, st.daily.streak + 1) : 1;
+    return { streak, amount: 40 + streak * 20 };
+  }
+  function claimDaily() {
+    const d = dailyPending();
+    if (!d) return null;
+    st.daily = { last: today(), streak: d.streak };
+    addAtoms(d.amount, 'Daily bonus');
+    save();
+    return d;
+  }
+  const adReadyIn = () => Math.max(0, st.adAt + AD_COOLDOWN - Date.now());
+  function adReward() { st.adAt = Date.now(); addAtoms(AD_ATOMS, 'Ad reward'); save(); }
+
   return {
     load, save, poll, reportCombo, reroll, isUnlocked, isEarned, unlockReq, unlockByAd, addXp, reset, xpForLevel,
+    addAtoms, buyElement, buySlot, slotPrice, dailyPending, claimDaily, adReadyIn, adReward, AD_ATOMS, MAX_SLOTS,
     on: (k, f) => cb[k].push(f),
     get state() { return st; },
     get visible() { return VISIBLE; },

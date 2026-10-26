@@ -7,8 +7,7 @@
   <meta name="description" content="Powder Lab - a vibrant falling-sand physics sandbox. Mix 70+ elements, discover reactions, blow things up and level up.">
   <title>Powder Lab</title>
   <script>try { if (localStorage.getItem('powderlab_theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}</script>
-  <link rel="stylesheet" href="css/style.css?v=5">
-  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <div id="app">
@@ -34,6 +33,9 @@
       </div>
 
       <div class="top-actions">
+        <button class="atom-pill" id="atomBox" data-tip="Atoms - tap to open the shop"><svg data-icon="atom"></svg><span id="atomNum">0</span><i class="atom-plus">+</i></button>
+        <button class="ibtn" id="btnShop" data-tip="Shop"><svg data-icon="bag"></svg></button>
+        <button class="ibtn" id="btnSaves" data-tip="Save slots"><svg data-icon="save"></svg></button>
         <button class="ibtn" id="btnMissionsM" data-tip="Missions"><svg data-icon="target"></svg><span class="dot hidden" id="missionDot"></span></button>
         <button class="ibtn" id="btnCodex" data-tip="Element Codex"><svg data-icon="book"></svg></button>
         <button class="ibtn" id="btnSound" data-tip="Sound"><svg data-icon="sound"></svg></button>
@@ -112,10 +114,15 @@
           <button class="tbtn big" id="btnPause"><svg data-icon="pause"></svg><span>Pause</span></button>
           <button class="tbtn big danger" id="btnClear"><svg data-icon="trash"></svg><span>Clear</span></button>
         </section>
+        <section class="row2">
+          <button class="tbtn big" id="btnSaveR"><svg data-icon="save"></svg><span>Save</span></button>
+          <button class="tbtn big" id="btnLoadR"><svg data-icon="load"></svg><span>Load</span></button>
+        </section>
         <section id="missionPanel">
           <h3>Missions <span class="pill" id="missionCount">0</span></h3>
           <div id="missionList"></div>
         </section>
+        <div id="bestCombo">Highest combo <b>x0</b></div>
       </aside>
     </main>
 
@@ -139,16 +146,17 @@
   <!-- ============================ OVERLAYS ============================ -->
   <div id="modal" class="hidden"><div class="modal-card" id="modalCard"></div></div>
   <div id="tooltip" class="hidden"></div>
-  <div id="loader"><div class="loader-logo">POWDER<b>LAB</b></div><div class="loader-bar"><div></div></div></div>
+  <div id="loader"><div class="loader-logo">POWDER<b>LAB</b></div><div class="loader-bar"><div></div></div>
+    <div class="loader-warn">⚠ Contains flashing lights and screen shake</div></div>
 
-  <script src="js/elements.js?v=5"></script>
-  <script src="js/sim.js?v=5"></script>
-  <script src="js/render.js?v=5"></script>
-  <script src="js/audio.js?v=5"></script>
-  <script src="js/platform.js?v=5"></script>
-  <script src="js/progress.js?v=5"></script>
-  <script src="js/icons.js?v=5"></script>
-  <script src="js/ui.js?v=5"></script>
-  <script src="js/main.js?v=5"></script>
+  <script src="js/elements.js?v=7"></script>
+  <script src="js/sim.js?v=7"></script>
+  <script src="js/render.js?v=7"></script>
+  <script src="js/audio.js?v=7"></script>
+  <script src="js/platform.js?v=7"></script>
+  <script src="js/progress.js?v=7"></script>
+  <script src="js/icons.js?v=7"></script>
+  <script src="js/ui.js?v=7"></script>
+  <script src="js/main.js?v=7"></script>
 </body>
 </html>

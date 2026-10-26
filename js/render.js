@@ -16,6 +16,8 @@ const Renderer = (() => {
   const HUE = new Uint32Array(360);
   const FIRE_RAMP = new Uint32Array(64);
   const HOT_RAMP = new Uint32Array(64);
+  const BLUE_RAMP = new Uint32Array(64);
+  const FROST_RAMP = new Uint32Array(64);
   let bgTop = [13, 14, 17], bgBot = [4, 4, 6];
 
   const pack = (r, g, b) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
@@ -50,6 +52,8 @@ const Renderer = (() => {
     for (let h = 0; h < 360; h++) HUE[h] = Sim.hsl(h, 1, 0.6) >>> 0;
     ramp(['#5a0d05', '#b3200b', '#ff4d1f', '#ff9a1f', '#ffd23d', '#fff6c2'], 64, FIRE_RAMP);
     ramp(['#3a0500', '#a01c00', '#ff4a00', '#ff9a1a', '#ffe680', '#ffffff'], 64, HOT_RAMP);
+    ramp(['#06104a', '#0b2fb3', '#1f6bff', '#3dc2ff', '#a8ecff', '#ffffff'], 64, BLUE_RAMP);
+    ramp(['#0a3a4a', '#1a7a9a', '#4fd2ff', '#9ff0ff', '#e0fbff', '#ffffff'], 64, FROST_RAMP);
   }
 
   function init(mainCv, glowCv, bloomCv) {
@@ -231,6 +235,39 @@ const Renderer = (() => {
           case 'tnt': if (((i / W) | 0) % 4 === 0) c = pack(40, 30, 30); break;
           case 'barrel': if (((i / W) | 0) % 3 === 0) c = pack(120, 128, 140); break;
           case 'flower': g = 0.12; break;
+          case 'bluefire': case 'frostfire': {
+            let k = life[i] * 2 + (sh & 7) - 4; k = k < 0 ? 0 : k > 63 ? 63 : k;
+            c = (fx === 'bluefire' ? BLUE_RAMP : FROST_RAMP)[k]; g = 1; break;
+          }
+          case 'rainbowfire': {
+            const f = Math.min(1, life[i] / 30);
+            c = scale(HUE[(sh * 3 + tick * 4) % 360], 0.45 + f * 0.75); g = 1; break;
+          }
+          case 'phoenix': c = FIRE_RAMP[40 + ((sh + tick) & 23)]; break;
+          case 'glowstick': c = HUE[(sh * 7) % 360]; break;
+          case 'uranium': if (((sh + tick) & 15) === 0) { c = mix(c, 0xffffffff, 0.5); g = 1; } break;
+          case 'bubble': c = mix(bg[i], ((sh & 3) === 0) ? 0xffffffff : c, (sh & 3) === 0 ? 0.6 : 0.3); break;
+          case 'cloud': c = mix(bg[i], c, 0.85); break;
+          case 'colorsmoke': {
+            let a = life[i] / 140; if (a > 0.75) a = 0.75;
+            c = mix(bg[i], HUE[(sh * 5) % 360], a); g = a * 0.4; break;
+          }
+          case 'ghost': c = mix(bg[i], c, 0.45 + 0.2 * Math.sin(tick * 0.15 + sh)); break;
+          case 'candy': c = (((i % W) + ((i / W) | 0)) & 3) < 2 ? pack(255, 79, 122) : pack(255, 255, 255); break;
+          case 'brick': if (((i / W) | 0) % 4 === 0 || ((i % W) + ((((i / W) | 0) >> 2) & 1) * 4) % 8 === 0) c = pack(190, 180, 170); break;
+          case 'magnet': c = ((i % W) & 2) ? pack(232, 55, 62) : pack(201, 206, 214); break;
+          case 'bulb': if (life[i] > 0) { c = pack(255, 246, 196); g = 1.4; } else { c = pack(92, 90, 74); g = 0; } break;
+          case 'fan': c = (((i % W) + (tick >> 1)) & 3) === 0 ? pack(220, 228, 240) : pack(108, 118, 136); break;
+          case 'drain': c = ((i % W) + ((i / W) | 0)) & 1 ? pack(42, 47, 58) : pack(20, 22, 28); break;
+          case 'portal': c = PAL[(t << 4) | ((sh + (tick >> 1)) & 15)]; c = mix(c, 0xffffffff, 0.25 + 0.25 * Math.sin(tick * 0.2 + sh)); break;
+          case 'stasis': c = mix(c, 0xffffffff, 0.3 + 0.3 * Math.sin(tick * 0.1 + sh * 0.3)); break;
+          case 'volcano': if (((sh + (tick >> 2)) & 7) === 0) { c = FIRE_RAMP[30]; g = 0.8; } break;
+          case 'cactus': if ((sh & 15) === 0) c = pack(240, 240, 200); break;
+          case 'bee': c = (((i % W) + (tick >> 3)) & 1) ? pack(255, 210, 61) : pack(26, 26, 26); break;
+          case 'bird': c = ((tick >> 3) + sh) & 1 ? pack(79, 179, 255) : pack(40, 120, 220); break;
+          case 'sun': c = 0xffffffff; g = 1.5; break;
+          case 'whitehole': c = 0xffffffff; g = 1.5; break;
+          case 'vortex': c = HUE[(tick * 6) % 360]; g = 1.2; break;
           case 'wood': if (((i % W) + (sh & 1)) % 3 === 0) c = scale(c, 0.88); break;
         }
       }
@@ -273,6 +310,33 @@ const Renderer = (() => {
       }
     }
 
+    // sun / white hole / vortex halos
+    const hl = Sim.halos;
+    for (let k = 0; k + 1 < hl.length && k < 40; k += 2) {
+      const i = hl[k], kind = hl[k + 1], cx = i % W, cy = (i / W) | 0;
+      const R = kind === 1 ? 5 : 4;
+      for (let dy = -R - 3; dy <= R + 3; dy++) for (let dx = -R - 3; dx <= R + 3; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const j = y * W + x;
+        if (kind === 1) {
+          if (d <= R) { buf[j] = mix(pack(255, 255, 255), pack(255, 200, 60), d / R); gbuf[j] = pack(255, 220, 120); }
+          else if (d <= R + 3) gbuf[j] = scale(pack(255, 170, 40), 1 - (d - R) / 3);
+        } else if (kind === 2) {
+          if (d <= 2) buf[j] = 0xffffffff;
+          if (d <= R + 2) gbuf[j] = scale(pack(220, 235, 255), 1 - d / (R + 3));
+        } else {
+          const ang = Math.atan2(dy, dx) - tick * 0.15 + d * 0.5;
+          if (d <= R + 3 && d > 1 && Math.sin(ang * 3) > 0.3) {
+            const col = HUE[((tick * 4 + d * 20) | 0) % 360];
+            gbuf[j] = scale(col, 0.8);
+            if (type[j] === 0) buf[j] = mix(buf[j], col, 0.5);
+          }
+        }
+      }
+    }
+
     // particles
     const P = Sim.particles, pc = P.count;
     for (let p = 0; p < pc; p++) {
@@ -302,6 +366,9 @@ const Renderer = (() => {
     const d = ELEMENTS[id];
     if (d.fx === 'rainbow') return 'linear-gradient(135deg,#ff4d4d,#ffd23d,#4dff88,#4dd2ff,#b24dff)';
     if (d.fx === 'neon') return 'linear-gradient(135deg,#ff3df2,#7a3dff,#3dd6ff)';
+    if (d.fx === 'glowstick' || d.fx === 'rainbowfire') return 'linear-gradient(135deg,#ff3df2,#ffd23d,#3dff9a,#3dc2ff,#a45cff)';
+    if (d.fx === 'bluefire') return 'linear-gradient(0deg,#0b2fb3,#1f6bff 55%,#a8ecff)';
+    if (d.fx === 'frostfire') return 'linear-gradient(0deg,#1a7a9a,#4fd2ff 55%,#e0fbff)';
     if (d.key === 'FIRE') return 'linear-gradient(0deg,#ff4d1f,#ff9a1f 55%,#ffde3d)';
     const cs = d.col.slice(0, 3);
     if (cs.length === 1) cs.push(cs[0]);
