@@ -96,6 +96,7 @@ const UI = (() => {
     };
 
     document.querySelectorAll('#selBar button').forEach(b => b.onclick = () => selAction(b.dataset.sel));
+    $('stampDone').onclick = () => { setStamp(false); Sfx.click(); };
 
     buildMobileBar();
     hydrateIcons();
@@ -217,7 +218,7 @@ const UI = (() => {
   function setTool(id) {
     s.tool = id;
     if (id !== 'select') { s.sel = null; $('selBar').classList.add('hidden'); }
-    if (id !== 'select') s.stamp = false;
+    if (id !== 'select') setStamp(false);
     document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === id));
     document.querySelectorAll('#elGrid .el').forEach(b => b.classList.toggle('on', id === 'draw' && +b.dataset.id === s.el));
     $('btnEraser').classList.toggle('on', id === 'draw' && s.el === 0);
@@ -346,6 +347,7 @@ const UI = (() => {
 
   function onDown(e) {
     if (s.modalOpen) return;
+    if (e.target.closest && e.target.closest('#selBar, #stampBar, #toastStack')) return;
     const p = s.ptr;
     if (p.down) return;
     wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId);
@@ -434,8 +436,8 @@ const UI = (() => {
       s.clip = Sim.copyRegion(r.x0, r.y0, r.x1, r.y1);
       buildGhost();
       if (a === 'cut') { pushUndo(); Sim.fillRegion(r.x0, r.y0, r.x1, r.y1, 0); }
-      s.stamp = true;
-      toast({ k: 'STAMP MODE', n: isTouch() ? 'Tap to paste' : 'Click to paste', c: 'var(--cyan)', life: 2 });
+      setStamp(true);
+      toast({ k: 'PASTE MODE', n: isTouch() ? 'Tap to paste copies' : 'Click to paste copies', c: 'var(--cyan)', life: 2 });
     } else if (a === 'fill') {
       pushUndo(); Sim.fillRegion(r.x0, r.y0, r.x1, r.y1, s.el);
       Sim.stats.placed[s.el] += (r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1);
@@ -444,6 +446,11 @@ const UI = (() => {
     }
     s.sel = null;
     $('selBar').classList.add('hidden');
+  }
+
+  function setStamp(on) {
+    s.stamp = on;
+    $('stampBar').classList.toggle('hidden', !on);
   }
 
   function buildGhost() {
@@ -483,7 +490,7 @@ const UI = (() => {
     if (e.target && e.target.tagName === 'INPUT') return;
     if (e.key === 'Escape') {
       if (s.modalOpen) { closeModal(); return; }
-      if (s.stamp || s.sel) { s.stamp = false; s.sel = null; $('selBar').classList.add('hidden'); return; }
+      if (s.stamp || s.sel) { setStamp(false); s.sel = null; $('selBar').classList.add('hidden'); return; }
     }
     if (s.modalOpen) return;
     const k = e.key.toLowerCase();
@@ -567,7 +574,9 @@ const UI = (() => {
     octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const p = s.ptr;
     const touchIdle = !p.down && !matchMedia('(hover: hover)').matches;
-    if ((!p.inside && !p.down) || s.modalOpen || touchIdle) return;
+    const selVisible = s.tool === 'select' && (s.sel || s.stamp);
+    if (((!p.inside && !p.down) || touchIdle) && !selVisible) return;
+    if (s.modalOpen) return;
     const [ox, oy, cs] = gridToWrap(0, 0);
     const gx = p.gx, gy = p.gy;
     octx.lineWidth = 1.5;
